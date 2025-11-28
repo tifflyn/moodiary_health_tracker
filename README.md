@@ -1,12 +1,22 @@
-# moodiaryhealthtracker_new
+# Moodiary: An Health Tracker Application
 
-A new Flutter project.
+## An Airost Intern Project, an app for mental health support, developed by Group ABC
+With the rise of remote work and digital lifestyles, many people are experiencing increased levels of stress, anxiety, and emotional fatigue. 
+## Environment Set Up
+1. Install Git (install flutter sdk using Git) and Flutter
+2. Install Android Studio
 
-## Getting Started
+## Installation
+1. Download the whole zip file of the code
+2. Unzip file to desired file location
+3. Boot up Android Studio IDE and naviagte to virtual device manager
+4. Create Pixel 8 with Android API 34 for better experience as we use this device as the model
+5. Connect to the device
 
-This project is a starting point for a Flutter application.
+## Execution / Run
+1. Run "flutter pub get" at command prompt
+2. Run "flutter run" ro tun the code
 
-A few resources to get you started if this is your first Flutter project:
 
 - [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
 - [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
