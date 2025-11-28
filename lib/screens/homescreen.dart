@@ -7,10 +7,10 @@ import 'logemotionscreen.dart';
 import 'ai_chatbot_screen.dart';
 import 'self_care/daily_recommendation_screen.dart';
 import 'profile_screen.dart';
-import 'check_in/diary_screen.dart'; 
+import 'check_in/diary_screen.dart';
 import 'check_in/check_in_screen.dart';
-
-
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isLoading = true;
   bool showLineChart = false;
   int _currentIndex = 0;
-  
+
   // To-do list completion states
   bool emotionLogged = false;
   bool checkInCompleted = false;
@@ -34,33 +34,33 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     loadWeekData();
-    _loadCompletionStates();
+    loadCompletionStates();
   }
 
   Future<void> loadWeekData() async {
     setState(() => isLoading = true);
-    
+
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final endOfWeek = startOfWeek.add(const Duration(days: 6, hours: 23, minutes: 59));
-    
+    final endOfWeek = startOfWeek.add(
+      const Duration(days: 6, hours: 23, minutes: 59),
+    );
+
     final logs = await DatabaseService.instance.getEmotionsForDateRange(
       startOfWeek,
       endOfWeek,
     );
-    
-    if (mounted)
-    {
+
+    if (mounted) {
       setState(() {
-      weekLogs = logs;
-      isLoading = false;
-    });
+        weekLogs = logs;
+        isLoading = false;
+      });
     }
-    
   }
 
   // Load completion states from shared preferences or database
-  Future<void> _loadCompletionStates() async {
+  Future<void> loadCompletionStates() async {
     // You'll need to implement this based on your storage solution
     // For now, using mock data
     setState(() {
@@ -71,11 +71,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Save completion states
-  Future<void> _saveCompletionStates() async {
+  Future<void> saveCompletionStates() async {
     // Implement saving to shared preferences or database
   }
 
-  Future<void> _deleteLog(int? id) async {
+  Future<void> deleteLog(int? id) async {
     if (id == null) return;
     await DatabaseService.instance.deleteEmotion(id);
     loadWeekData();
@@ -105,59 +105,14 @@ class _HomeScreenState extends State<HomeScreen> {
     for (int i = 0; i < weekDates.length; i++) {
       final dateKey = DateFormat('yyyy-MM-dd').format(weekDates[i]);
       final logsForDay = groupedLogs[dateKey] ?? [];
-      
+
       if (logsForDay.isNotEmpty) {
-        final avgIntensity = logsForDay
-            .map((log) => log.intensity)
-            .reduce((a, b) => a + b) / logsForDay.length;
+        final avgIntensity =
+            logsForDay.map((log) => log.intensity).reduce((a, b) => a + b) /
+            logsForDay.length;
         spots.add(FlSpot(i.toDouble(), avgIntensity.toDouble()));
       } else {
         spots.add(FlSpot(i.toDouble(), 0));
-      }
-    }
-
-    return spots;
-  }
-
-  // Convert emotion to numeric value for line chart
-  double emotionToValue(String emotion) {
-    switch (emotion) {
-      case 'happy':
-        return 9.0;
-      case 'calm':
-        return 7.0;
-      case 'anxious':
-        return 4.0;
-      case 'sad':
-        return 3.0;
-      case 'angry':
-        return 2.0;
-      default:
-        return 5.0;
-    }
-  }
-
-  // Get emotion-based line chart data
-  List<FlSpot> getEmotionLineChartData() {
-    final weekDates = getWeekDates();
-    final groupedLogs = groupLogsByDate();
-    final spots = <FlSpot>[];
-
-    for (int i = 0; i < weekDates.length; i++) {
-      final dateKey = DateFormat('yyyy-MM-dd').format(weekDates[i]);
-      final logsForDay = groupedLogs[dateKey] ?? [];
-      
-      if (logsForDay.isNotEmpty) {
-        final emotionCounts = <String, int>{};
-        for (var log in logsForDay) {
-          emotionCounts[log.emotion] = (emotionCounts[log.emotion] ?? 0) + 1;
-        }
-        final dominantEmotion = emotionCounts.entries
-            .reduce((a, b) => a.value > b.value ? a : b)
-            .key;
-        spots.add(FlSpot(i.toDouble(), emotionToValue(dominantEmotion)));
-      } else {
-        spots.add(FlSpot(i.toDouble(), 5.0));
       }
     }
 
@@ -199,6 +154,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget homeContent() {
+    // 获取 AuthProvider 实例
+    final authProvider = Provider.of<AuthProvider>(context);
+    final nickname = authProvider.user.nickname;
+
     final weekDates = getWeekDates();
     final groupedLogs = groupLogsByDate();
 
@@ -207,6 +166,17 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 🌟 新增：欢迎信息
+          Text(
+            'Hey, $nickname!', // 使用用户的昵称
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.purple,
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // WEEKLY CHART
           Card(
             elevation: 4,
@@ -233,16 +203,22 @@ class _HomeScreenState extends State<HomeScreen> {
                           IconButton(
                             icon: Icon(
                               Icons.bar_chart,
-                              color: !showLineChart ? Colors.purple : Colors.grey,
+                              color: !showLineChart
+                                  ? Colors.purple
+                                  : Colors.grey,
                             ),
-                            onPressed: () => setState(() => showLineChart = false),
+                            onPressed: () =>
+                                setState(() => showLineChart = false),
                           ),
                           IconButton(
                             icon: Icon(
                               Icons.show_chart,
-                              color: showLineChart ? Colors.purple : Colors.grey,
+                              color: showLineChart
+                                  ? Colors.purple
+                                  : Colors.grey,
                             ),
-                            onPressed: () => setState(() => showLineChart = true),
+                            onPressed: () =>
+                                setState(() => showLineChart = true),
                           ),
                         ],
                       ),
@@ -252,8 +228,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
                     child: showLineChart
-                        ? _buildLineChart(weekDates)
-                        : _buildBarChart(weekDates, groupedLogs),
+                        ? buildLineChart(weekDates)
+                        : buildBarChart(weekDates, groupedLogs),
                   ),
                 ],
               ),
@@ -275,23 +251,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   const Text(
                     'Daily Wellness Tasks',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
                   const Text(
                     'Complete these tasks to maintain your mental wellness:',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                   const SizedBox(height: 16),
 
                   // To-Do List Items
-                  _buildTodoItem(
+                  buildTodoItem(
                     title: 'Log Your Emotions',
                     subtitle: 'Express how you\'re feeling today',
                     icon: Icons.mood,
@@ -300,26 +270,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () async {
                       await Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const LogEmotionScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const LogEmotionScreen(),
+                        ),
                       );
-                      
+
                       // Refresh data when returning from LogEmotionScreen
                       await loadWeekData();
-                      
+
                       // Check if any emotions were logged today to mark as completed
                       final todayLogs = getTodayLogs();
                       if (todayLogs.isNotEmpty) {
                         setState(() {
                           emotionLogged = true;
                         });
-                        _saveCompletionStates();
+                        saveCompletionStates();
                       }
                     },
                   ),
 
                   const SizedBox(height: 12),
 
-                  _buildTodoItem(
+                  buildTodoItem(
                     title: 'Daily Check-In',
                     subtitle: 'Reflect on your day',
                     icon: Icons.edit_note,
@@ -328,22 +300,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () async {
                       final result = await Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const CheckInScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const CheckInScreen(),
+                        ),
                       );
-                      
+
                       // Check if check-in was submitted
                       if (result == true) {
                         setState(() {
                           checkInCompleted = true;
                         });
-                        _saveCompletionStates();
+                        saveCompletionStates();
                       }
                     },
                   ),
 
                   const SizedBox(height: 12),
 
-                  _buildTodoItem(
+                  buildTodoItem(
                     title: 'Breathing Exercise',
                     subtitle: 'Calm your mind with breathing',
                     icon: Icons.air,
@@ -352,15 +326,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () async {
                       final result = await Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const DailyRecommendationScreen()),
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const DailyRecommendationScreen(),
+                        ),
                       );
-                      
+
                       // Check if breathing exercise was completed
                       if (result == true) {
                         setState(() {
                           breathingExerciseCompleted = true;
                         });
-                        _saveCompletionStates();
+                        saveCompletionStates();
                       }
                     },
                   ),
@@ -434,10 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // TODAY'S ENTRIES
           const Text(
             'Today\'s Entries',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
 
@@ -450,10 +424,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ListTile(
                 leading: CircleAvatar(
                   backgroundColor: getEmotionColor(log.emotion),
-                  child: Icon(
-                    getEmotionIcon(log.emotion),
-                    color: Colors.white,
-                  ),
+                  child: Icon(getEmotionIcon(log.emotion), color: Colors.white),
                 ),
                 title: Text(
                   log.emotion.toUpperCase(),
@@ -482,15 +453,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           builder: (context) => AlertDialog(
                             title: const Text("Delete Entry"),
                             content: const Text(
-                                "Are you sure you want to delete this emotion entry?"),
+                              "Are you sure you want to delete this emotion entry?",
+                            ),
                             actions: [
                               TextButton(
                                 child: const Text("Cancel"),
                                 onPressed: () => Navigator.pop(context, false),
                               ),
                               TextButton(
-                                child: const Text("Delete",
-                                    style: TextStyle(color: Colors.red)),
+                                child: const Text(
+                                  "Delete",
+                                  style: TextStyle(color: Colors.red),
+                                ),
                                 onPressed: () => Navigator.pop(context, true),
                               ),
                             ],
@@ -498,7 +472,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
 
                         if (confirm == true) {
-                          _deleteLog(log.id);
+                          deleteLog(log.id);
                         }
                       },
                     ),
@@ -526,7 +500,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Build To-Do List Item
-  Widget _buildTodoItem({
+  Widget buildTodoItem({
     required String title,
     required String subtitle,
     required IconData icon,
@@ -540,10 +514,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withValues(alpha:0.1),
+          color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isCompleted ? Colors.green : color.withValues(alpha:0.3),
+            color: isCompleted ? Colors.green : color.withOpacity(0.3),
             width: 2,
           ),
         ),
@@ -552,7 +526,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isCompleted ? Colors.green : color.withValues(alpha:0.2),
+                color: isCompleted ? Colors.green : color.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -572,7 +546,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       fontWeight: FontWeight.bold,
                       color: isCompleted ? Colors.green : color,
                       fontSize: 16,
-                      decoration: isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
+                      decoration: isCompleted
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -581,7 +557,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                       color: isCompleted ? Colors.green : Colors.grey[600],
                       fontSize: 12,
-                      decoration: isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
+                      decoration: isCompleted
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
                     ),
                   ),
                 ],
@@ -605,19 +583,20 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.purple,
+        foregroundColor: Colors.white,
         title: const Text('Mental Health Tracker'),
         centerTitle: true,
       ),
 
-      body: _currentIndex == 0 
-          ? homeContent() 
+      body: _currentIndex == 0
+          ? homeContent()
           : _currentIndex == 1
-              ? const DiaryScreen()
-              : _currentIndex == 2
-                  ? const AIChatbotScreen()
-                  : _currentIndex == 3
-                      ? const DailyRecommendationScreen()
-                      : const ProfileScreen(),
+          ? const DiaryScreen()
+          : _currentIndex == 2
+          ? const AIChatbotScreen()
+          : _currentIndex == 3
+          ? const DailyRecommendationScreen()
+          : const ProfileScreen(),
 
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -630,59 +609,55 @@ class _HomeScreenState extends State<HomeScreen> {
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.book),
-            label: 'Diary',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat),
-            label: 'AI Chatbot',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Diary'),
+          BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'AI Chatbot'),
           BottomNavigationBarItem(
             icon: Icon(Icons.music_note),
             label: 'Self-care',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
 
       floatingActionButton: _currentIndex == 0
-        ? FloatingActionButton.extended(
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const LogEmotionScreen()),
-              );
-              
-              // Refresh data when returning
-              await loadWeekData();
-              
-              // Check if any emotions were logged today
-              final todayLogs = getTodayLogs();
-              if (todayLogs.isNotEmpty) {
-                setState(() {
-                  emotionLogged = true;
-                });
-                _saveCompletionStates();
-              }
-            },
-            backgroundColor: Colors.purple,
-            icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text('Log Emotion', style: TextStyle(color: Colors.white)),
-          )
-        : null,
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LogEmotionScreen(),
+                  ),
+                );
+
+                // Refresh data when returning
+                await loadWeekData();
+
+                // Check if any emotions were logged today
+                final todayLogs = getTodayLogs();
+                if (todayLogs.isNotEmpty) {
+                  setState(() {
+                    emotionLogged = true;
+                  });
+                  saveCompletionStates();
+                }
+              },
+              backgroundColor: Colors.purple,
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text(
+                'Log Emotion',
+                style: TextStyle(color: Colors.white),
+              ),
+            )
+          : null,
     );
   }
 
   // Build Bar Chart Widget
-  Widget _buildBarChart(List<DateTime> weekDates, Map<String, List<EmotionLog>> groupedLogs) {
+  Widget buildBarChart(
+    List<DateTime> weekDates,
+    Map<String, List<EmotionLog>> groupedLogs,
+  ) {
     return SizedBox(
       key: const ValueKey('barChart'),
       height: 200,
@@ -692,7 +667,8 @@ class _HomeScreenState extends State<HomeScreen> {
         children: weekDates.map((date) {
           final dateKey = DateFormat('yyyy-MM-dd').format(date);
           final logsForDay = groupedLogs[dateKey] ?? [];
-          final isToday = DateFormat('yyyy-MM-dd').format(date) ==
+          final isToday =
+              DateFormat('yyyy-MM-dd').format(date) ==
               DateFormat('yyyy-MM-dd').format(DateTime.now());
 
           String? dominantEmotion;
@@ -715,12 +691,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   DateFormat('E').format(date),
                   style: TextStyle(
                     fontSize: 12,
-                    fontWeight: isToday
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                    color: isToday
-                        ? Colors.purple
-                        : Colors.grey[600],
+                    fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                    color: isToday ? Colors.purple : Colors.grey[600],
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -728,9 +700,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   date.day.toString(),
                   style: TextStyle(
                     fontSize: 10,
-                    color: isToday
-                        ? Colors.purple
-                        : Colors.grey[500],
+                    color: isToday ? Colors.purple : Colors.grey[500],
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -739,7 +709,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     height: 80 + (logsForDay.length * 10.0),
                     width: 40,
                     decoration: BoxDecoration(
-                      color: getEmotionColor(dominantEmotion).withValues(alpha:0.7),
+                      color: getEmotionColor(dominantEmotion).withOpacity(0.7),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
@@ -775,11 +745,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: 2,
                       ),
                     ),
-                    child: Icon(
-                      Icons.add,
-                      color: Colors.grey[400],
-                      size: 20,
-                    ),
+                    child: Icon(Icons.add, color: Colors.grey[400], size: 20),
                   ),
               ],
             ),
@@ -790,9 +756,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Build Line Chart Widget
-  Widget _buildLineChart(List<DateTime> weekDates) {
+  Widget buildLineChart(List<DateTime> weekDates) {
     final spots = getLineChartData();
-    
+
     return SizedBox(
       key: const ValueKey('lineChart'),
       height: 200,
@@ -812,10 +778,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     drawVerticalLine: false,
                     horizontalInterval: 2,
                     getDrawingHorizontalLine: (value) {
-                      return FlLine(
-                        color: Colors.grey[300]!,
-                        strokeWidth: 1,
-                      );
+                      return FlLine(color: Colors.grey[300]!, strokeWidth: 1);
                     },
                   ),
                   titlesData: FlTitlesData(
@@ -832,7 +795,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         reservedSize: 30,
                         interval: 1,
                         getTitlesWidget: (double value, TitleMeta meta) {
-                          if (value.toInt() >= 0 && value.toInt() < weekDates.length) {
+                          if (value.toInt() >= 0 &&
+                              value.toInt() < weekDates.length) {
                             final date = weekDates[value.toInt()];
                             return SideTitleWidget(
                               meta: meta,
@@ -899,7 +863,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       belowBarData: BarAreaData(
                         show: true,
-                        color: Colors.purple.withValues(alpha:0.1),
+                        color: Colors.purple.withOpacity(0.1),
                       ),
                     ),
                   ],
@@ -917,7 +881,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             children: [
                               TextSpan(
-                                text: 'Intensity: ${barSpot.y.toStringAsFixed(1)}',
+                                text:
+                                    'Intensity: ${barSpot.y.toStringAsFixed(1)}',
                                 style: const TextStyle(
                                   color: Colors.white70,
                                   fontSize: 12,
@@ -956,7 +921,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final mostCommon = emotionCounts.entries
           .reduce((a, b) => a.value > b.value ? a : b)
           .key;
-      insights.add('Your most common emotion this week: ${mostCommon.toUpperCase()}');
+      insights.add(
+        'Your most common emotion this week: ${mostCommon.toUpperCase()}',
+      );
     }
 
     final negativeCount = weekLogs
@@ -964,7 +931,9 @@ class _HomeScreenState extends State<HomeScreen> {
         .length;
 
     if (negativeCount >= 5) {
-      insights.add('You\'ve had several challenging moments. Consider self-care activities.');
+      insights.add(
+        'You\'ve had several challenging moments. Consider self-care activities.',
+      );
     }
 
     return insights;
