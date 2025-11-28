@@ -13,53 +13,57 @@ class CheckInScreen extends StatefulWidget {
 class _CheckInScreenState extends State<CheckInScreen> {
   String? selectedEmoji;
   final TextEditingController _diaryController = TextEditingController();
-  final TextEditingController _titleController = TextEditingController(); // Add this controller
+  final TextEditingController _titleController = TextEditingController();
   bool isLoading = false;
   CheckIn? generatedCheckIn;
 
   final emojis = [
-    {'emoji': '😊', 'label': 'Happy'},
-    {'emoji': '😢', 'label': 'Sad'},
-    {'emoji': '😰', 'label': 'Anxious'},
-    {'emoji': '😤', 'label': 'Frustrated'},
-    {'emoji': '😴', 'label': 'Tired'},
-    {'emoji': '🤗', 'label': 'Loved'},
-    {'emoji': '😡', 'label': 'Angry'},
-    {'emoji': '😌', 'label': 'Calm'},
+    {'emoji': '😊', 'label': 'Happy', 'emotion': 'happy'},
+    {'emoji': '😢', 'label': 'Sad', 'emotion': 'sad'},
+    {'emoji': '😰', 'label': 'Anxious', 'emotion': 'anxious'},
+    {'emoji': '😤', 'label': 'Frustrated', 'emotion': 'frustrated'},
+    {'emoji': '😴', 'label': 'Tired', 'emotion': 'tired'},
+    {'emoji': '🤗', 'label': 'Loved', 'emotion': 'loved'},
+    {'emoji': '😡', 'label': 'Angry', 'emotion': 'angry'},
+    {'emoji': '😌', 'label': 'Calm', 'emotion': 'calm'},
   ];
+
+  // 获取当前选择的情绪
+  String get _selectedEmotion {
+    if (selectedEmoji == null) return 'neutral';
+    final emojiData = emojis.firstWhere(
+      (e) => e['emoji'] == selectedEmoji,
+      orElse: () => {'emotion': 'neutral'},
+    );
+    return emojiData['emotion'] ?? 'neutral';
+  }
 
   Future<void> _submitCheckIn() async {
     if (selectedEmoji == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an emoji')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select an emoji')));
       return;
     }
 
     setState(() => isLoading = true);
 
     try {
-      // Get recent emotions for AI context
-      final recentEmotions = await DatabaseService.instance.getEmotionsForDateRange(
-        DateTime.now().subtract(const Duration(days: 7)),
-        DateTime.now(),
+      final userMessage = _buildUserMessage();
+
+      final aiResponse = await AIService.instance.generateTherapistResponse(
+        userMessage,
+        null, // 不传递情绪日志
       );
-
-      // Avoid overwriting BuildContext
-      final aiContext = _diaryController.text.isEmpty
-          ? 'User selected: $selectedEmoji'
-          : 'User selected: $selectedEmoji and wrote: ${_diaryController.text}';
-
-      final aiResponse =
-          await AIService.instance.generateTherapistResponse(aiContext, recentEmotions);
 
       final checkIn = CheckIn(
         emoji: selectedEmoji!,
         diary: _diaryController.text.isEmpty ? null : _diaryController.text,
-        title: _titleController.text.isEmpty ? null : _titleController.text, // Add this line
+        title: _titleController.text.isEmpty ? null : _titleController.text,
         aiResponse: aiResponse,
         timestamp: DateTime.now(),
+        emotion: _selectedEmotion, // 新增 emotion
       );
 
       await DatabaseService.instance.insertCheckIn(checkIn);
@@ -71,16 +75,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
         isLoading = false;
       });
     } catch (e) {
-      // Handle any errors that occur during submission
       debugPrint('Error submitting check-in: $e');
-      
+
       if (!mounted) return;
 
       setState(() {
         isLoading = false;
       });
 
-      // Show error to user
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error submitting check-in: ${e.toString()}'),
@@ -89,6 +91,26 @@ class _CheckInScreenState extends State<CheckInScreen> {
         ),
       );
     }
+  }
+
+  String _buildUserMessage() {
+    final emojiLabel = emojis.firstWhere(
+      (e) => e['emoji'] == selectedEmoji,
+      orElse: () => {'label': 'unknown', 'emotion': 'neutral'},
+    )['label'];
+
+    String message =
+        'I selected the $emojiLabel emoji ($selectedEmoji) to represent my mood. My emotion is: $_selectedEmotion.';
+
+    if (_diaryController.text.isNotEmpty) {
+      message += ' Here\'s what I wrote about my day: ${_diaryController.text}';
+    }
+
+    if (_titleController.text.isNotEmpty) {
+      message += ' The title of my entry is: "${_titleController.text}".';
+    }
+
+    return message;
   }
 
   @override
@@ -121,7 +143,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
             // Emoji grid
             SizedBox(
-              height: 200, // Fixed height to prevent overflow
+              height: 200,
               child: GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -147,7 +169,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
                         color: isSelected ? Colors.purple : Colors.grey[100],
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isSelected ? Colors.purple : Colors.transparent,
+                          color: isSelected
+                              ? Colors.purple
+                              : Colors.transparent,
                           width: 3,
                         ),
                       ),
@@ -172,8 +196,12 @@ class _CheckInScreenState extends State<CheckInScreen> {
                                 emoji['label']!,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: isSelected ? Colors.white : Colors.black87,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.black87,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                 ),
                                 textAlign: TextAlign.center,
                                 maxLines: 1,
@@ -191,7 +219,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
             const SizedBox(height: 32),
 
-            // Add Title Field here
+            // Title Field
             const Text(
               'Title (Optional)',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -202,7 +230,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
               maxLines: 1,
               decoration: InputDecoration(
                 hintText: "Give your entry a title...",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.purple, width: 2),
@@ -223,7 +253,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
               maxLines: 5,
               decoration: InputDecoration(
                 hintText: "What's on your mind today?",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.purple, width: 2),
@@ -240,13 +272,18 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 onPressed: isLoading ? null : _submitCheckIn,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purple,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text(
                         'Submit Check-In',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
               ),
             ),
@@ -296,7 +333,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
                       SizedBox(width: 8),
                       Text(
                         'AI Companion',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -320,7 +360,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purple,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: const Text(
                   'Done',
@@ -340,12 +382,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     generatedCheckIn = null;
                     selectedEmoji = null;
                     _diaryController.clear();
-                    _titleController.clear(); 
+                    _titleController.clear();
                   });
                 },
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Colors.purple),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: const Text(
                   'Check In Again',
@@ -362,7 +406,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
   @override
   void dispose() {
     _diaryController.dispose();
-    _titleController.dispose(); 
+    _titleController.dispose();
     super.dispose();
   }
 }

@@ -27,7 +27,7 @@ class AuthProvider extends ChangeNotifier {
     // 通知所有监听者（如 main.dart 中的 Consumer）状态已更改
     notifyListeners();
 
-    debugPrint("User setup complete! Nickname: $nickname, Age: $age");
+    print("User setup complete! Nickname: $nickname, Age: $age");
   }
 
   // 保持向后兼容的旧方法（可选）
@@ -39,7 +39,7 @@ class AuthProvider extends ChangeNotifier {
   void logout() {
     _user = null;
     notifyListeners();
-    debugPrint("User logged out.");
+    print("User logged out.");
   }
 
   // 3. 更新用户信息的方法（用于编辑昵称、年龄或性别）
@@ -58,7 +58,7 @@ class AuthProvider extends ChangeNotifier {
         avatar: avatar ?? _user!.avatar,
       );
       notifyListeners();
-      debugPrint(
+      print(
         "User info updated! Nickname: ${_user!.nickname}, Age: ${_user!.age}, Gender: ${_user!.gender}",
       );
     }

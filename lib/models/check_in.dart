@@ -5,6 +5,7 @@ class CheckIn {
   final String? title; // Add this line
   final String aiResponse;
   final DateTime timestamp;
+  final String emotion;
 
   CheckIn({
     this.id,
@@ -13,6 +14,7 @@ class CheckIn {
     this.title, // Add this line
     required this.aiResponse,
     required this.timestamp,
+    required this.emotion,
   });
 
   Map<String, dynamic> toMap() {
@@ -23,6 +25,7 @@ class CheckIn {
       'title': title, // Add this line
       'aiResponse': aiResponse,
       'timestamp': timestamp.toIso8601String(),
+      'emotion': emotion,
     };
   }
 
@@ -34,6 +37,7 @@ class CheckIn {
       title: map['title'], // Add this line
       aiResponse: map['aiResponse'],
       timestamp: DateTime.parse(map['timestamp']),
+      emotion: map['emotion'] ?? 'neutral',
     );
   }
 }
