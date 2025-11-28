@@ -514,10 +514,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha:0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isCompleted ? Colors.green : color.withOpacity(0.3),
+            color: isCompleted ? Colors.green : color.withValues(alpha:0.3),
             width: 2,
           ),
         ),
@@ -526,7 +526,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isCompleted ? Colors.green : color.withOpacity(0.2),
+                color: isCompleted ? Colors.green : color.withValues(alpha:0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -709,7 +709,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     height: 80 + (logsForDay.length * 10.0),
                     width: 40,
                     decoration: BoxDecoration(
-                      color: getEmotionColor(dominantEmotion).withOpacity(0.7),
+                      color: getEmotionColor(dominantEmotion).withValues(alpha:0.7),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
@@ -863,7 +863,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       belowBarData: BarAreaData(
                         show: true,
-                        color: Colors.purple.withOpacity(0.1),
+                        color: Colors.purple.withValues(alpha:0.1),
                       ),
                     ),
                   ],

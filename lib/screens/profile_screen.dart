@@ -497,7 +497,7 @@ class ProfileScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // 使用新的 Radio 语法
-                  RadioListTile(
+                  RadioListTile<String>(
                     title: const Text('Male'),
                     value: 'Male',
                     groupValue: selectedGender,
@@ -507,7 +507,7 @@ class ProfileScreen extends StatelessWidget {
                       });
                     },
                   ),
-                  RadioListTile(
+                  RadioListTile<String>(
                     title: const Text('Female'),
                     value: 'Female',
                     groupValue: selectedGender,
@@ -517,7 +517,7 @@ class ProfileScreen extends StatelessWidget {
                       });
                     },
                   ),
-                  RadioListTile(
+                  RadioListTile<String>(
                     title: const Text('Non-binary'),
                     value: 'Non-binary',
                     groupValue: selectedGender,
@@ -527,7 +527,7 @@ class ProfileScreen extends StatelessWidget {
                       });
                     },
                   ),
-                  RadioListTile(
+                  RadioListTile<String>(
                     title: const Text('Prefer not to say'),
                     value: 'Prefer not to say',
                     groupValue: selectedGender,
