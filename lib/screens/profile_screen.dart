@@ -500,7 +500,9 @@ class ProfileScreen extends StatelessWidget {
                   RadioListTile(
                     title: const Text('Male'),
                     value: 'Male',
+                    // ignore: deprecated_member_use
                     groupValue: selectedGender,
+                    // ignore: deprecated_member_use
                     onChanged: (value) {
                       setState(() {
                         selectedGender = value!;
@@ -510,7 +512,9 @@ class ProfileScreen extends StatelessWidget {
                   RadioListTile(
                     title: const Text('Female'),
                     value: 'Female',
+                    // ignore: deprecated_member_use
                     groupValue: selectedGender,
+                    // ignore: deprecated_member_use
                     onChanged: (value) {
                       setState(() {
                         selectedGender = value!;
@@ -520,7 +524,9 @@ class ProfileScreen extends StatelessWidget {
                   RadioListTile(
                     title: const Text('Non-binary'),
                     value: 'Non-binary',
+                    // ignore: deprecated_member_use
                     groupValue: selectedGender,
+                    // ignore: deprecated_member_use
                     onChanged: (value) {
                       setState(() {
                         selectedGender = value!;
@@ -530,7 +536,9 @@ class ProfileScreen extends StatelessWidget {
                   RadioListTile(
                     title: const Text('Prefer not to say'),
                     value: 'Prefer not to say',
+                    // ignore: deprecated_member_use
                     groupValue: selectedGender,
+                    // ignore: deprecated_member_use
                     onChanged: (value) {
                       setState(() {
                         selectedGender = value!;

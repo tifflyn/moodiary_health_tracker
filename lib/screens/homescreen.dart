@@ -11,6 +11,7 @@ import 'check_in/diary_screen.dart';
 import 'check_in/check_in_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/charts.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -81,6 +82,24 @@ class _HomeScreenState extends State<HomeScreen> {
     loadWeekData();
   }
 
+  String getEnergyLabel(String emotion) {
+    switch (emotion) {
+      case 'totally_drained':
+        return 'Totally drained.';
+      case 'running_low':
+        return 'Running low...';
+      case 'medium_energy':
+        return 'Medium energy';
+      case 'energized':
+        return 'Energized!';
+      case 'fully_charged':
+        return 'Fully charged!!!';
+      default:
+        return emotion;
+    }
+  }
+
+
   List<DateTime> getWeekDates() {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
@@ -119,39 +138,41 @@ class _HomeScreenState extends State<HomeScreen> {
     return spots;
   }
 
-  Color getEmotionColor(String emotion) {
+    Color getEmotionColor(String emotion) {
     switch (emotion) {
-      case 'happy':
-        return Colors.green;
-      case 'sad':
-        return Colors.blue;
-      case 'anxious':
-        return Colors.orange;
-      case 'angry':
+      case 'totally_drained':
         return Colors.red;
-      case 'calm':
+      case 'running_low':
+        return Colors.orange;
+      case 'medium_energy':
+        return Colors.green;
+      case 'energized':
+        return Colors.blue;
+      case 'fully_charged':
         return Colors.purple;
       default:
         return Colors.grey;
     }
   }
 
-  IconData getEmotionIcon(String emotion) {
+
+    IconData getEmotionIcon(String emotion) {
     switch (emotion) {
-      case 'happy':
-        return Icons.sentiment_very_satisfied;
-      case 'sad':
-        return Icons.sentiment_dissatisfied;
-      case 'anxious':
-        return Icons.sentiment_neutral;
-      case 'angry':
-        return Icons.sentiment_very_dissatisfied;
-      case 'calm':
-        return Icons.favorite;
+      case 'totally_drained':
+        return Icons.battery_0_bar;
+      case 'running_low':
+        return Icons.battery_1_bar;
+      case 'medium_energy':
+        return Icons.battery_2_bar;
+      case 'energized':
+        return Icons.battery_3_bar;
+      case 'fully_charged':
+        return Icons.battery_full;
       default:
-        return Icons.sentiment_neutral;
+        return Icons.battery_unknown;
     }
   }
+
 
   Widget homeContent() {
     // 获取 AuthProvider 实例
@@ -225,12 +246,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: showLineChart
-                        ? buildLineChart(weekDates)
-                        : buildBarChart(weekDates, groupedLogs),
-                  ),
+                 AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: showLineChart
+                      ? buildLineChart(
+                          weekDates: weekDates,
+                          spots: getLineChartData(),
+                          hasData: weekLogs.isNotEmpty,
+                        )
+                      : buildBarChart(
+                          weekDates: weekDates,
+                          groupedLogs: groupedLogs,
+                          getEmotionColor: getEmotionColor,
+                          getEmotionIcon: getEmotionIcon,
+                        ),
+                ),
                 ],
               ),
             ),
@@ -426,10 +456,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   backgroundColor: getEmotionColor(log.emotion),
                   child: Icon(getEmotionIcon(log.emotion), color: Colors.white),
                 ),
+
                 title: Text(
-                  log.emotion.toUpperCase(),
+                  getEnergyLabel(log.emotion),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
+
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -441,7 +473,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${log.intensity}/10',
+                      '${log.intensity}/5',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(width: 8),
@@ -514,10 +546,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha:0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isCompleted ? Colors.green : color.withOpacity(0.3),
+            color: isCompleted ? Colors.green : color.withValues(alpha:0.3),
             width: 2,
           ),
         ),
@@ -526,7 +558,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isCompleted ? Colors.green : color.withOpacity(0.2),
+                color: isCompleted ? Colors.green : color.withValues(alpha:0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -650,253 +682,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             )
           : null,
-    );
-  }
-
-  // Build Bar Chart Widget
-  Widget buildBarChart(
-    List<DateTime> weekDates,
-    Map<String, List<EmotionLog>> groupedLogs,
-  ) {
-    return SizedBox(
-      key: const ValueKey('barChart'),
-      height: 200,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: weekDates.map((date) {
-          final dateKey = DateFormat('yyyy-MM-dd').format(date);
-          final logsForDay = groupedLogs[dateKey] ?? [];
-          final isToday =
-              DateFormat('yyyy-MM-dd').format(date) ==
-              DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-          String? dominantEmotion;
-          if (logsForDay.isNotEmpty) {
-            final emotionCounts = <String, int>{};
-            for (var log in logsForDay) {
-              emotionCounts[log.emotion] =
-                  (emotionCounts[log.emotion] ?? 0) + 1;
-            }
-            dominantEmotion = emotionCounts.entries
-                .reduce((a, b) => a.value > b.value ? a : b)
-                .key;
-          }
-
-          return Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  DateFormat('E').format(date),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                    color: isToday ? Colors.purple : Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  date.day.toString(),
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isToday ? Colors.purple : Colors.grey[500],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (dominantEmotion != null)
-                  Container(
-                    height: 80 + (logsForDay.length * 10.0),
-                    width: 40,
-                    decoration: BoxDecoration(
-                      color: getEmotionColor(dominantEmotion).withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          getEmotionIcon(dominantEmotion),
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${logsForDay.length}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  Container(
-                    height: 40,
-                    width: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.grey[300]!,
-                        style: BorderStyle.solid,
-                        width: 2,
-                      ),
-                    ),
-                    child: Icon(Icons.add, color: Colors.grey[400], size: 20),
-                  ),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  // Build Line Chart Widget
-  Widget buildLineChart(List<DateTime> weekDates) {
-    final spots = getLineChartData();
-
-    return SizedBox(
-      key: const ValueKey('lineChart'),
-      height: 200,
-      child: weekLogs.isEmpty
-          ? Center(
-              child: Text(
-                'Log emotions to see trend',
-                style: TextStyle(color: Colors.grey[500]),
-              ),
-            )
-          : Padding(
-              padding: const EdgeInsets.only(right: 20, top: 10),
-              child: LineChart(
-                LineChartData(
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: 2,
-                    getDrawingHorizontalLine: (value) {
-                      return FlLine(color: Colors.grey[300]!, strokeWidth: 1);
-                    },
-                  ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 30,
-                        interval: 1,
-                        getTitlesWidget: (double value, TitleMeta meta) {
-                          if (value.toInt() >= 0 &&
-                              value.toInt() < weekDates.length) {
-                            final date = weekDates[value.toInt()];
-                            return SideTitleWidget(
-                              meta: meta,
-                              child: Text(
-                                DateFormat('E').format(date),
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: 2,
-                        reservedSize: 35,
-                        getTitlesWidget: (double value, TitleMeta meta) {
-                          return Text(
-                            value.toInt().toString(),
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
-                              fontSize: 12,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  borderData: FlBorderData(
-                    show: true,
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey[300]!, width: 1),
-                      left: BorderSide(color: Colors.grey[300]!, width: 1),
-                    ),
-                  ),
-                  minX: 0,
-                  maxX: 6,
-                  minY: 0,
-                  maxY: 10,
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: spots,
-                      isCurved: true,
-                      color: Colors.purple,
-                      barWidth: 3,
-                      isStrokeCapRound: true,
-                      dotData: FlDotData(
-                        show: true,
-                        getDotPainter: (spot, percent, barData, index) {
-                          return FlDotCirclePainter(
-                            radius: 4,
-                            color: Colors.white,
-                            strokeWidth: 2,
-                            strokeColor: Colors.purple,
-                          );
-                        },
-                      ),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        color: Colors.purple.withOpacity(0.1),
-                      ),
-                    ),
-                  ],
-                  lineTouchData: LineTouchData(
-                    enabled: true,
-                    touchTooltipData: LineTouchTooltipData(
-                      getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
-                        return touchedBarSpots.map((barSpot) {
-                          final date = weekDates[barSpot.x.toInt()];
-                          return LineTooltipItem(
-                            '${DateFormat('MMM d').format(date)}\n',
-                            const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            children: [
-                              TextSpan(
-                                text:
-                                    'Intensity: ${barSpot.y.toStringAsFixed(1)}',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          );
-                        }).toList();
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ),
     );
   }
 

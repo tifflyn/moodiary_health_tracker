@@ -1,3 +1,4 @@
+// lib/screens/logemotionscreen.dart
 import 'package:flutter/material.dart';
 import '../models/emotionlog.dart';
 import '../services/database_service.dart';
@@ -10,29 +11,60 @@ class LogEmotionScreen extends StatefulWidget {
 }
 
 class _LogEmotionScreenState extends State<LogEmotionScreen> {
-  String? selectedEmotion;
-  double intensity = 5;
+  String? selectedEnergy; // store the energy "name"
+  int intensity = 3; // default (will be set when user taps an energy)
   final TextEditingController noteController = TextEditingController();
 
-  final emotions = [
-    {'name': 'happy', 'label': 'Happy', 'icon': Icons.sentiment_very_satisfied, 'color': Colors.green},
-    {'name': 'sad', 'label': 'Sad', 'icon': Icons.sentiment_dissatisfied, 'color': Colors.blue},
-    {'name': 'anxious', 'label': 'Anxious', 'icon': Icons.sentiment_neutral, 'color': Colors.orange},
-    {'name': 'angry', 'label': 'Angry', 'icon': Icons.sentiment_very_dissatisfied, 'color': Colors.red},
-    {'name': 'calm', 'label': 'Calm', 'icon': Icons.favorite, 'color': Colors.purple},
+  final energies = [
+    {
+      'name': 'totally_drained',
+      'label': 'Totally drained.',
+      'icon': Icons.battery_0_bar,
+      'color': Colors.red,
+      'value': 1
+    },
+    {
+      'name': 'running_low',
+      'label': 'Running low...',
+      'icon': Icons.battery_1_bar,
+      'color': Colors.orange,
+      'value': 2
+    },
+    {
+      'name': 'medium_energy',
+      'label': 'Medium energy',
+      'icon': Icons.battery_2_bar,
+      'color': Colors.green,
+      'value': 3
+    },
+    {
+      'name': 'energized',
+      'label': 'Energized!',
+      'icon': Icons.battery_3_bar,
+      'color': Colors.blue,
+      'value': 4
+    },
+    {
+      'name': 'fully_charged',
+      'label': 'Fully charged!!!',
+      'icon': Icons.battery_full,
+      'color': Colors.purple,
+      'value': 5
+    },
   ];
 
   Future<void> saveEmotion() async {
-    if (selectedEmotion == null) {
+    if (selectedEnergy == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an emotion')),
+        const SnackBar(content: Text('Please select an energy level')),
       );
       return;
     }
 
+    // intensity already set when selecting; ensure it's consistent
     final log = EmotionLog(
-      emotion: selectedEmotion!,
-      intensity: intensity.round(),
+      emotion: selectedEnergy!,
+      intensity: intensity,
       note: noteController.text,
       dateTime: DateTime.now(),
     );
@@ -41,10 +73,17 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Emotion logged successfully!')),
+        const SnackBar(content: Text('Entry saved!')),
       );
       Navigator.pop(context);
     }
+  }
+
+  void _onSelectEnergy(Map<String, Object?> energy) {
+    setState(() {
+      selectedEnergy = energy['name'] as String?;
+      intensity = (energy['value'] as int?) ?? 3;
+    });
   }
 
   @override
@@ -54,7 +93,7 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.purple,
-        title: const Text('Log Your Emotion'),
+        title: const Text('Log Your Energy'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -62,33 +101,29 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'How are you feeling?',
+              'What\'s your energy level right now?',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Wrap(
               spacing: 12,
               runSpacing: 12,
-              children: emotions.map((emotion) {
-                final isSelected = selectedEmotion == emotion['name'];
+              children: energies.map((energy) {
+                final isSelected = selectedEnergy == energy['name'];
+                final color = energy['color'] as Color;
                 return GestureDetector(
-                  onTap: () => setState(() => selectedEmotion = emotion['name'] as String),
+                  onTap: () => _onSelectEnergy(energy),
                   child: Container(
                     width: (MediaQuery.of(context).size.width - 56) / 3,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? (emotion['color'] as Color)
-                          : Colors.white,
+                      color: isSelected ? color : Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: emotion['color'] as Color,
-                        width: 2,
-                      ),
+                      border: Border.all(color: color, width: 2),
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
-                                color: (emotion['color'] as Color).withValues(alpha: 0.3),
+                                color: color.withValues(alpha:0.25),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4),
                               )
@@ -98,13 +133,14 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
                     child: Column(
                       children: [
                         Icon(
-                          emotion['icon'] as IconData,
+                          energy['icon'] as IconData,
                           size: 40,
-                          color: isSelected ? Colors.white : emotion['color'] as Color,
+                          color: isSelected ? Colors.white : color,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          emotion['label'] as String,
+                          energy['label'] as String,
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: isSelected ? Colors.white : Colors.black87,
@@ -116,41 +152,9 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
                 );
               }).toList(),
             ),
-            const SizedBox(height: 32),
-            const Text(
-              'Intensity',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: Slider(
-                    value: intensity,
-                    min: 1,
-                    max: 10,
-                    divisions: 9,
-                    label: intensity.round().toString(),
-                    activeColor: Colors.purple,
-                    onChanged: (value) => setState(() => intensity = value),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.purple,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '${intensity.round()}/10',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+
+            // NOTE: intensity slider removed intentionally per request.
+
             const SizedBox(height: 32),
             const Text(
               'Notes (Optional)',
@@ -161,10 +165,8 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
               controller: noteController,
               maxLines: 5,
               decoration: InputDecoration(
-                hintText: 'What triggered this emotion? Any thoughts...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                hintText: 'What triggered this feeling? Any thoughts...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.purple, width: 2),
@@ -179,9 +181,7 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
                 onPressed: saveEmotion,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purple,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text(
                   'Save Entry',
