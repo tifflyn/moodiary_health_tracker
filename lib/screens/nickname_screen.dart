@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import 'age_selection_screen.dart'; // 导入下一个屏幕
+import 'age_selection_screen.dart';
 
 class NicknameScreen extends StatefulWidget {
-  const NicknameScreen({super.key});
+  final String email;
+  final String password;
+
+  const NicknameScreen({
+    super.key,
+    required this.email,
+    required this.password,
+  });
 
   @override
   State<NicknameScreen> createState() => _NicknameScreenState();
@@ -39,17 +46,20 @@ class _NicknameScreenState extends State<NicknameScreen> {
     if (_formKey.currentState!.validate()) {
       final nickname = _nicknameController.text.trim();
 
-      // 1. 在 AuthProvider 中保存昵称，年龄暂时设为0
+      // 暂时保存昵称到 AuthProvider
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      authProvider.setUserInfo(
-        nickname,
-        0,
-      ); // 使用 setUserInfo 而不是 setTemporaryNickname
+      authProvider.updateUserInfo(nickname: nickname);
 
-      // 2. 导航到年龄选择屏幕
+      // 导航到年龄选择屏幕，传递所有信息
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const AgeSelectionScreen()),
+        MaterialPageRoute(
+          builder: (context) => AgeSelectionScreen(
+            email: widget.email,
+            password: widget.password,
+            nickname: nickname,
+          ),
+        ),
       );
     }
   }
@@ -58,7 +68,7 @@ class _NicknameScreenState extends State<NicknameScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // 返回按钮回到 WelcomeScreen
+        // 返回按钮回到 EmailScreen
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.purple),
           onPressed: () => Navigator.pop(context),

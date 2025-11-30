@@ -1,69 +1,279 @@
 import 'package:flutter/material.dart';
-import '../models/user_model.dart'; // 导入我们刚刚定义的模型
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/user_model.dart';
+import '../models/daily_recommendation.dart'; // 添加这个导入
+import '../services/firebase_service.dart';
+import '../services/database_service.dart';
 
 class AuthProvider extends ChangeNotifier {
-  // 存储当前登录的用户信息，初始为 null
-  UserModel? _user;
+  UserModel _user = UserModel.empty();
+  bool _isLoggedIn = false;
+  bool _isLoading = false;
 
-  // 暴露给外部的 User Getter (只读)
-  UserModel get user {
-    if (_user == null) {
-      // 这是一个安全措施，理论上只有 isLoggedIn 为 true 时才会被访问
-      throw Exception("User is not logged in!");
+  UserModel get user => _user;
+  bool get isLoggedIn => _isLoggedIn;
+  bool get isLoading => _isLoading;
+
+  AuthProvider() {
+    _initializeAuth();
+  }
+
+  Future<void> _initializeAuth() async {
+    _isLoading = true;
+    notifyListeners();
+
+    // Listen to Firebase auth state changes
+    FirebaseService.instance.authStateChanges.listen((
+      User? firebaseUser,
+    ) async {
+      if (firebaseUser != null && firebaseUser.emailVerified) {
+        // User is signed in and email is verified
+        try {
+          final userProfile = await FirebaseService.instance.getUserProfile(
+            firebaseUser.uid,
+          );
+          _user = userProfile;
+          _isLoggedIn = true;
+
+          // Migrate local data to Firebase on first login
+          await _migrateLocalData(firebaseUser.uid);
+        } catch (e) {
+          debugPrint('Error loading user profile: $e');
+        }
+      } else {
+        _isLoggedIn = false;
+        _user = UserModel.empty();
+      }
+
+      _isLoading = false;
+      notifyListeners();
+    });
+  }
+
+  Future<void> _migrateLocalData(String userId) async {
+    try {
+      // Check if migration is needed by checking if user has any data in Firebase
+      final emotionsSnapshot = await FirebaseService.instance
+          .getEmotionLogs(userId)
+          .first;
+
+      if (emotionsSnapshot.isEmpty) {
+        // No data in Firebase, migrate from local database
+        final localEmotions = await DatabaseService.instance.getAllEmotions();
+        final localCheckIns = await DatabaseService.instance.getAllCheckIns();
+        final localChatMessages = await DatabaseService.instance
+            .getChatHistory();
+        final localRecommendations = await DatabaseService.instance
+            .getTodayRecommendation();
+
+        // 明确指定类型
+        final List<DailyRecommendation> recommendationsList =
+            localRecommendations != null ? [localRecommendations] : [];
+
+        await FirebaseService.instance.migrateLocalDataToFirebase(
+          userId,
+          emotions: localEmotions,
+          checkIns: localCheckIns,
+          chatMessages: localChatMessages,
+          recommendations: recommendationsList,
+        );
+
+        debugPrint('Local data migrated to Firebase successfully');
+      }
+    } catch (e) {
+      debugPrint('Error migrating local data: $e');
     }
-    return _user!;
   }
 
-  // 暴露给外部的登录状态 Getter (核心判断逻辑)
-  bool get isLoggedIn => _user != null;
+  // Email sign up
+  Future<void> signUpWithEmail({
+    required String email,
+    required String password,
+    required String nickname,
+    required int age,
+    required String gender,
+    required String avatar,
+  }) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
 
-  // 1. 模拟登录/设置完成 - 更新方法以包含年龄
-  void setUserInfo(String nickname, int age) {
-    _user = UserModel(
-      uid: DateTime.now().millisecondsSinceEpoch.toString(), // 简单的模拟 uid
-      nickname: nickname,
-      age: age, // 添加年龄参数
-    );
-    // 通知所有监听者（如 main.dart 中的 Consumer）状态已更改
-    notifyListeners();
+      // 先创建用户，获取 userCredential
+      final userCredential = await FirebaseService.instance.signUpWithEmail(
+        email: email,
+        password: password,
+        userData: UserModel(
+          id: '', // 先用空字符串，创建后会被覆盖
+          email: email,
+          nickname: nickname,
+          age: age,
+          gender: gender,
+          avatar: avatar,
+          createdAt: DateTime.now(),
+        ),
+      );
 
-    debugPrint("User setup complete! Nickname: $nickname, Age: $age");
+      if (userCredential != null) {
+        // 使用实际的用户ID更新用户数据
+        final userData = UserModel(
+          id: userCredential.user!.uid, // 使用 Firebase UID
+          email: email,
+          nickname: nickname,
+          age: age,
+          gender: gender,
+          avatar: avatar,
+          createdAt: DateTime.now(),
+        );
+
+        // 更新 Firestore 中的用户数据
+        await FirebaseService.instance.updateUserProfile(
+          userCredential.user!.uid,
+          userData.toMap(),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      _isLoading = false;
+      notifyListeners();
+
+      // 重新抛出特定的错误信息
+      if (e.code == 'email-already-in-use') {
+        throw FirebaseAuthException(
+          code: 'email-already-in-use',
+          message: 'This email is already registered. Please sign in instead.',
+        );
+      } else {
+        rethrow;
+      }
+
+      // Note: User needs to verify email before they can sign in
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  // 保持向后兼容的旧方法（可选）
-  void setNickname(String nickname) {
-    setUserInfo(nickname, 0); // 默认年龄为 0
+  // Email sign in
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      await FirebaseService.instance.signInWithEmail(
+        email: email,
+        password: password,
+      );
+
+      // 立即检查登录状态并更新
+      final currentUser = FirebaseService.instance.currentUser;
+      if (currentUser != null && currentUser.emailVerified) {
+        try {
+          final userProfile = await FirebaseService.instance.getUserProfile(
+            currentUser.uid,
+          );
+          _user = userProfile;
+          _isLoggedIn = true;
+          notifyListeners(); // 立即通知状态改变
+          debugPrint(
+            '✅ User signed in and state updated: ${userProfile.nickname}',
+          );
+        } catch (e) {
+          debugPrint('Error loading user profile after sign in: $e');
+        }
+      }
+
+      // Auth state listener will handle the rest (setting _isLoggedIn, etc.)
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    }
   }
 
-  // 2. 模拟登出功能 (可选，但推荐)
-  void logout() {
-    _user = null;
-    notifyListeners();
-    debugPrint("User logged out.");
+  // Google sign in
+  Future<void> signInWithGoogle() async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      await FirebaseService.instance.signInWithGoogle();
+
+      // Auth state listener will handle the rest
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    }
   }
 
-  // 3. 更新用户信息的方法（用于编辑昵称、年龄或性别）
-  void updateUserInfo({
+  // Update user profile information
+  Future<void> updateUserInfo({
     String? nickname,
     int? age,
     String? gender,
     String? avatar,
-  }) {
-    if (_user != null) {
-      _user = UserModel(
-        uid: _user!.uid, // 保持相同的 UID
-        nickname: nickname ?? _user!.nickname,
-        age: age ?? _user!.age,
-        gender: gender ?? _user!.gender, // 添加性别更新
-        avatar: avatar ?? _user!.avatar,
+  }) async {
+    try {
+      final updates = <String, dynamic>{};
+      if (nickname != null) updates['nickname'] = nickname;
+      if (age != null) updates['age'] = age;
+      if (gender != null) updates['gender'] = gender;
+      if (avatar != null) updates['avatar'] = avatar;
+
+      await FirebaseService.instance.updateUserProfile(_user.id, updates);
+
+      // Update local state
+      _user = _user.copyWith(
+        nickname: nickname ?? _user.nickname,
+        age: age ?? _user.age,
+        gender: gender ?? _user.gender,
+        avatar: avatar ?? _user.avatar,
       );
+
       notifyListeners();
-      debugPrint(
-        "User info updated! Nickname: ${_user!.nickname}, Age: ${_user!.age}, Gender: ${_user!.gender}",
-      );
+    } catch (e) {
+      debugPrint('Error updating user info: $e');
+      rethrow;
     }
   }
 
-  // 未来：添加持久化逻辑 (例如使用 SharedPreferences 来存储登录状态)
-  // Future<void> loadUserState() async { ... }
+  // Logout
+  Future<void> logout() async {
+    try {
+      await FirebaseService.instance.signOut();
+      await DatabaseService.instance.close();
+
+      _isLoggedIn = false;
+      _user = UserModel.empty();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error during logout: $e');
+    }
+  }
+
+  // Resend email verification
+  Future<void> resendVerificationEmail() async {
+    final user = FirebaseService.instance.currentUser;
+    if (user != null) {
+      await user.sendEmailVerification();
+    }
+  }
+
+  // For backward compatibility - keep old methods but mark as deprecated
+  @Deprecated('Use signUpWithEmail instead')
+  void setUserInfo(String nickname, int age) {
+    // This is now handled by Firebase authentication
+    debugPrint('setUserInfo is deprecated. Use signUpWithEmail instead.');
+  }
+
+  @Deprecated('Use updateUserInfo instead')
+  void setNickname(String nickname) {
+    updateUserInfo(nickname: nickname);
+  }
 }

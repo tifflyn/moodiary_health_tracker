@@ -1,30 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import 'homescreen.dart';
+import 'auth_screen.dart';
 
 class AgeSelectionScreen extends StatefulWidget {
-  const AgeSelectionScreen({super.key});
+  final String email;
+  final String password;
+  final String nickname;
+
+  const AgeSelectionScreen({
+    super.key,
+    required this.email,
+    required this.password,
+    required this.nickname,
+  });
 
   @override
   State<AgeSelectionScreen> createState() => _AgeSelectionScreenState();
 }
 
 class _AgeSelectionScreenState extends State<AgeSelectionScreen> {
-  // 模拟的年龄选项 (实际应用中可能需要更精确的范围)
   final List<int> ageOptions = [13, 18, 25, 35, 45, 55, 65];
   int? _selectedAge;
   bool _isLoading = false;
+  String _selectedGender = 'Prefer not to say';
 
-  // 最终提交登录/设置信息
   void _completeSetup() async {
     if (_selectedAge == null) {
-      // 如果没有选择年龄，可以弹出一个提示
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select your age to continue.')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select your age to continue.')),
+      );
       return;
     }
 
@@ -35,20 +40,38 @@ class _AgeSelectionScreenState extends State<AgeSelectionScreen> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // 使用 updateUserInfo 来更新年龄
-      authProvider.updateUserInfo(age: _selectedAge!);
-
-      // 直接导航到 HomeScreen，替换整个导航栈
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      // 使用 Firebase 注册用户
+      await authProvider.signUpWithEmail(
+        email: widget.email,
+        password: widget.password,
+        nickname: widget.nickname,
+        age: _selectedAge!,
+        gender: _selectedGender,
+        avatar: 'default',
       );
+
+      // 显示邮箱验证提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Please check your email for verification link. You can sign in after verification.',
+            ),
+            duration: Duration(seconds: 6),
+          ),
+        );
+
+        // 导航到登录界面
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AuthScreen()),
+        );
+      }
     } catch (e) {
-      // 处理可能的错误
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Setup failed: $e')));
+        ).showSnackBar(SnackBar(content: Text('Registration failed: $e')));
       }
     } finally {
       if (mounted) {
@@ -59,7 +82,6 @@ class _AgeSelectionScreenState extends State<AgeSelectionScreen> {
     }
   }
 
-  // 构建年龄选择按钮
   Widget _buildAgeButton(int age) {
     final isSelected = _selectedAge == age;
     return Padding(
@@ -110,13 +132,11 @@ class _AgeSelectionScreenState extends State<AgeSelectionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // 企鹅图标
             const Padding(
               padding: EdgeInsets.only(top: 20, bottom: 20),
               child: Icon(Icons.cake, size: 60, color: Colors.purple),
             ),
 
-            // 标题
             const Text(
               'And how old are you?',
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
@@ -128,7 +148,40 @@ class _AgeSelectionScreenState extends State<AgeSelectionScreen> {
             ),
             const SizedBox(height: 40),
 
-            // 年龄选择列表 (使用 Expanded 填充中间区域)
+            // 性别选择
+            const Text(
+              'Gender (Optional)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedGender,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Select your gender',
+              ),
+              items: ['Male', 'Female', 'Non-binary', 'Prefer not to say'].map((
+                String value,
+              ) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedGender = value!;
+                });
+              },
+            ),
+
+            const SizedBox(height: 24),
+            const Text(
+              'Age Group',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+
             Expanded(
               child: ListView.builder(
                 itemCount: ageOptions.length,
@@ -139,7 +192,6 @@ class _AgeSelectionScreenState extends State<AgeSelectionScreen> {
             ),
             const SizedBox(height: 20),
 
-            // 完成按钮
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -167,7 +219,7 @@ class _AgeSelectionScreenState extends State<AgeSelectionScreen> {
                           strokeWidth: 3,
                         ),
                       )
-                    : const Text('Finish Setup'),
+                    : const Text('Create Account'),
               ),
             ),
             const SizedBox(height: 20),

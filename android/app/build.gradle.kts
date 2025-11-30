@@ -5,6 +5,7 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services")  // 添加这一行
 }
 
 android {
@@ -25,7 +26,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.moodiaryhealthtracker_new"
-        minSdk = flutter.minSdkVersion
+        minSdk = flutter.minSdkVersion  // 修改为固定值 21
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -44,4 +45,5 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))  // 添加这一行
 }

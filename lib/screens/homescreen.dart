@@ -99,7 +99,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-
   List<DateTime> getWeekDates() {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
@@ -138,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return spots;
   }
 
-    Color getEmotionColor(String emotion) {
+  Color getEmotionColor(String emotion) {
     switch (emotion) {
       case 'totally_drained':
         return Colors.red;
@@ -155,8 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-
-    IconData getEmotionIcon(String emotion) {
+  IconData getEmotionIcon(String emotion) {
     switch (emotion) {
       case 'totally_drained':
         return Icons.battery_0_bar;
@@ -172,7 +170,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return Icons.battery_unknown;
     }
   }
-
 
   Widget homeContent() {
     // 获取 AuthProvider 实例
@@ -246,21 +243,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                 AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: showLineChart
-                      ? buildLineChart(
-                          weekDates: weekDates,
-                          spots: getLineChartData(),
-                          hasData: weekLogs.isNotEmpty,
-                        )
-                      : buildBarChart(
-                          weekDates: weekDates,
-                          groupedLogs: groupedLogs,
-                          getEmotionColor: getEmotionColor,
-                          getEmotionIcon: getEmotionIcon,
-                        ),
-                ),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: showLineChart
+                        ? buildLineChart(
+                            weekDates: weekDates,
+                            spots: getLineChartData(),
+                            hasData: weekLogs.isNotEmpty,
+                          )
+                        : buildBarChart(
+                            weekDates: weekDates,
+                            groupedLogs: groupedLogs,
+                            getEmotionColor: getEmotionColor,
+                            getEmotionIcon: getEmotionIcon,
+                          ),
+                  ),
                 ],
               ),
             ),
@@ -377,7 +374,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
 
           const SizedBox(height: 20),
-
           // INSIGHTS
           Card(
             elevation: 4,
@@ -546,10 +542,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withValues(alpha:0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isCompleted ? Colors.green : color.withValues(alpha:0.3),
+            color: isCompleted ? Colors.green : color.withValues(alpha: 0.3),
             width: 2,
           ),
         ),
@@ -558,7 +554,9 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isCompleted ? Colors.green : color.withValues(alpha:0.2),
+                color: isCompleted
+                    ? Colors.green
+                    : color.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(

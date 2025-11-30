@@ -56,6 +56,15 @@ dependencies:
   flutter_dotenv: ^5.1.0          # api
   google_generative_ai: ^0.4.7
 
+    # Firebase dependencies - 新增的 Firebase 依赖
+  firebase_core: ^2.24.0
+  firebase_auth: ^4.17.3
+  cloud_firestore: ^4.13.0
+  google_sign_in: ^6.1.5
+  firebase_storage: ^11.5.3
+
+
+
 //  fl_chart: ^0.69.0
 
 dev_dependencies:
