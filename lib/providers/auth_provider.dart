@@ -265,6 +265,23 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // 发送密码重置邮件
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   // For backward compatibility - keep old methods but mark as deprecated
   @Deprecated('Use signUpWithEmail instead')
   void setUserInfo(String nickname, int age) {
