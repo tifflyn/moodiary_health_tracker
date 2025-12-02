@@ -13,9 +13,9 @@ void main() async {
   // 添加 Firebase 初始化
   try {
     await Firebase.initializeApp();
-    print('✅ Firebase initialized successfully');
+    debugPrint('✅ Firebase initialized successfully');
   } catch (e) {
-    print('❌ Firebase initialization failed: $e');
+    debugPrint('❌ Firebase initialization failed: $e');
   }
 
   // IMPORTANT: Clear any old API keys and set Gemini

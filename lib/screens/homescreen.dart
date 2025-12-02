@@ -43,6 +43,11 @@ class _HomeScreenState extends State<HomeScreen> {
     loadWeekData();
     // 然后设置实时监听
     _setupRealTimeListener();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      loadCompletionStates();
+    });
+
   }
 
   // 添加实时监听方法
@@ -64,6 +69,11 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             onError: (error) {
               debugPrint('Error in emotion stream: $error');
+
+            if (mounted) {
+              loadWeekData();
+            }
+
             },
           );
     } catch (e) {
@@ -93,9 +103,43 @@ class _HomeScreenState extends State<HomeScreen> {
         // 检查今天是否记录了情绪（用于 TodoList）
         final todayLogs = _getTodayLogsFromList(weekEmotions);
         emotionLogged = todayLogs.isNotEmpty;
+
+        loadCompletionStates();
       });
     }
   }
+
+ void _debugPrintLogs() {
+    if (weekLogs.isEmpty) return;
+    
+    debugPrint('=== DEBUG: Checking EmotionLog IDs ===');
+    debugPrint('Total week logs: ${weekLogs.length}');
+    
+    final todayLogs = getTodayLogs();
+    debugPrint('Today\'s logs: ${todayLogs.length}');
+    
+    // Check for logs without IDs
+    int logsWithoutId = 0;
+    for (var log in weekLogs) {
+      if (log.id == null || log.id!.isEmpty) {
+        logsWithoutId++;
+        debugPrint('⚠️ EmotionLog without ID: emotion=${log.emotion}, date=${DateFormat('yyyy-MM-dd HH:mm').format(log.dateTime)}');
+      }
+    }
+    
+    // Print today's logs with IDs
+    for (var log in todayLogs) {
+      debugPrint('Today: id="${log.id ?? "NULL"}", ${log.emotion}, ${log.intensity}/5, ${DateFormat('HH:mm').format(log.dateTime)}');
+    }
+    
+    if (logsWithoutId > 0) {
+      debugPrint('❌ Found $logsWithoutId logs without IDs');
+    } else {
+      debugPrint('✅ All logs have proper IDs');
+    }
+    debugPrint('====================================');
+  }
+
 
   // 从列表中获取今天的日志
   List<EmotionLog> _getTodayLogsFromList(List<EmotionLog> allLogs) {
@@ -232,33 +276,41 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> deleteLog(String? emotionId) async {
-    // 参数改为 String?
-    if (emotionId == null) return;
-
-    // 获取当前用户ID
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final userId = authProvider.user.id;
-
-    if (userId.isEmpty) return;
-
-    try {
-      // 切换到 FirebaseService
-      await FirebaseService.instance.deleteEmotion(userId, emotionId);
-
-      // 重新加载数据
-      await loadWeekData();
-
-      // 显示成功提示
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Emotion entry deleted')));
-    } catch (e) {
-      debugPrint('Error deleting emotion from Firebase: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
-    }
+  if (emotionId == null || emotionId.isEmpty) {
+    debugPrint('❌ Cannot delete: emotionId is null or empty');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Cannot delete: Invalid emotion ID')),
+    );
+    return;
   }
+
+  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  final userId = authProvider.user.id;
+
+  if (userId.isEmpty) return;
+
+  try {
+    await FirebaseService.instance.deleteEmotion(userId, emotionId);
+
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Emotion entry deleted')),
+    );
+    
+    // Note: Real-time listener will automatically update the list
+  } catch (e) {
+    debugPrint('Error deleting emotion: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to delete: $e')),
+    );
+  }
+}
+
+Future<void> refreshAllData() async {
+  await loadCompletionStates();
+  await loadWeekData();
+}
+
 
   String getEnergyLabel(String emotion) {
     switch (emotion) {
@@ -773,6 +825,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!isLoading && weekLogs.isNotEmpty && _currentIndex == 0) {
+          _debugPrintLogs();
+        }
+      });
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -826,7 +885,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
 
                 // Refresh data when returning
-                await loadCompletionStates();
+                await refreshAllData();
               },
               backgroundColor: Colors.purple,
               icon: const Icon(Icons.add, color: Colors.white),
@@ -836,8 +895,13 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             )
           : null,
+          
     );
+    
   }
+
+
+
 
   List<EmotionLog> getTodayLogs() {
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());

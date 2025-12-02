@@ -6,6 +6,8 @@ import '../models/chat_message.dart';
 import '../models/check_in.dart';
 import '../models/daily_recommendation.dart';
 import '../models/user_model.dart';
+import 'package:flutter/foundation.dart';
+
 
 class FirebaseService {
   static final FirebaseService instance = FirebaseService._init();
@@ -184,33 +186,50 @@ class FirebaseService {
         );
   }
 
-  Future<List<EmotionLog>> getEmotionsForDateRange(
-    String userId,
-    DateTime start,
-    DateTime end,
-  ) async {
+ Future<List<EmotionLog>> getEmotionsForDateRange(
+  String userId,
+  DateTime start,
+  DateTime end,
+) async {
+  try {
+    // 将 DateTime 转换为字符串格式以便查询
+    final startStr = start.toIso8601String();
+    final endStr = end.toIso8601String();
+    
     final snapshot = await _firestore
         .collection('users')
         .doc(userId)
         .collection('emotions')
-        .where('dateTime', isGreaterThanOrEqualTo: start)
-        .where('dateTime', isLessThanOrEqualTo: end)
+        .where('dateTime', isGreaterThanOrEqualTo: startStr)
+        .where('dateTime', isLessThanOrEqualTo: endStr)
         .orderBy('dateTime')
         .get();
 
     return snapshot.docs.map((doc) {
-      return EmotionLog.fromFirestore(doc); // 使用新的工厂方法
+      return EmotionLog.fromFirestore(doc);
     }).toList();
+  } catch (e) {
+    if(kDebugMode)
+    {
+      print('❌ Error in getEmotionsForDateRange: $e');
+    }
+    
+    return [];
   }
+}
 
   Future<void> deleteEmotion(String userId, String emotionId) async {
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('emotions')
-        .doc(emotionId)
-        .delete();
+  if (emotionId.isEmpty) {
+    throw Exception('Emotion ID is empty');
   }
+  
+  await _firestore
+      .collection('users')
+      .doc(userId)
+      .collection('emotions')
+      .doc(emotionId)
+      .delete();
+}
 
   // Check-ins
   Future<void> addCheckIn(String userId, CheckIn checkIn) async {
@@ -295,7 +314,11 @@ class FirebaseService {
 
       return snapshot.docs.map((doc) => CheckIn.fromFirestore(doc)).toList();
     } catch (e) {
-      print('Error getting today check-ins: $e');
+      if (kDebugMode)
+      {
+        print('Error getting today check-ins: $e');
+      }
+      
       return [];
     }
   }

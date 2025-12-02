@@ -168,7 +168,7 @@ class _AuthScreenState extends State<AuthScreen> {
     bool isResetting = false;
 
     return Container(
-      color: Colors.black.withOpacity(0.5),
+      color: Colors.black.withValues(alpha:0.5),
       child: Center(
         child: Dialog(
           shape: RoundedRectangleBorder(
