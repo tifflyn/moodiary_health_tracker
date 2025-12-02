@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 import '../../models/check_in.dart';
-import '../../services/database_service.dart';
+import '../../services/firebase_service.dart';
 import 'check_in_screen.dart';
 
 class DiaryScreen extends StatefulWidget {
@@ -14,20 +16,49 @@ class DiaryScreen extends StatefulWidget {
 class _DiaryScreenState extends State<DiaryScreen> {
   List<CheckIn> _diaryEntries = [];
   bool _isLoading = true;
+  final FirebaseService _firebaseService = FirebaseService.instance; // 添加这行
+  User? _currentUser; // 添加这行
+  StreamSubscription<List<CheckIn>>? _diarySubscription;
 
   @override
   void initState() {
     super.initState();
+    _currentUser = FirebaseAuth.instance.currentUser;
     _loadDiaryEntries();
   }
 
   Future<void> _loadDiaryEntries() async {
     try {
-      final entries = await DatabaseService.instance.getAllCheckIns();
-      setState(() {
-        _diaryEntries = entries;
-        _isLoading = false;
-      });
+      if (_currentUser == null) {
+        setState(() {
+          _diaryEntries = [];
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // 使用 Stream 实时监听数据变化
+      _diarySubscription?.cancel();
+      _diarySubscription = _firebaseService
+          .getCheckIns(_currentUser!.uid)
+          .listen(
+            (checkIns) {
+              if (mounted) {
+                setState(() {
+                  _diaryEntries = checkIns;
+                  _isLoading = false;
+                });
+              }
+            },
+            onError: (error) {
+              debugPrint('Error loading diary entries: $error');
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                });
+              }
+            },
+          );
     } catch (e) {
       debugPrint('Error loading diary entries: $e');
       setState(() {
@@ -40,7 +71,10 @@ class _DiaryScreenState extends State<DiaryScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EditDiaryScreen(checkIn: checkIn),
+        builder: (context) => EditDiaryScreen(
+          checkIn: checkIn,
+          userId: _currentUser?.uid ?? '', // 传递 userId
+        ),
       ),
     );
 
@@ -75,6 +109,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
                 return DiaryEntryCard(
                   checkIn: entry,
                   onTap: () => _navigateToEditScreen(entry),
+                  onDelete: () => _deleteEntry(entry), // 添加删除功能
                 );
               },
             ),
@@ -93,13 +128,66 @@ class _DiaryScreenState extends State<DiaryScreen> {
       ),
     );
   }
+
+  Future<void> _deleteEntry(CheckIn checkIn) async {
+    if (_currentUser == null || checkIn.id == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Entry'),
+        content: const Text(
+          'Are you sure you want to delete this diary entry?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _firebaseService.deleteCheckIn(_currentUser!.uid, checkIn.id!);
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Entry deleted')));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error deleting: $e')));
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _diarySubscription?.cancel();
+    super.dispose();
+  }
 }
 
 class DiaryEntryCard extends StatelessWidget {
   final CheckIn checkIn;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
-  const DiaryEntryCard({super.key, required this.checkIn, required this.onTap});
+  const DiaryEntryCard({
+    super.key,
+    required this.checkIn,
+    required this.onTap,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -127,6 +215,15 @@ class DiaryEntryCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (onDelete != null)
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete,
+                        color: Colors.red,
+                        size: 20,
+                      ),
+                      onPressed: onDelete,
+                    ),
                   Text(
                     _formatDate(checkIn.timestamp),
                     style: const TextStyle(fontSize: 14, color: Colors.grey),
@@ -206,8 +303,13 @@ class DiaryEntryCard extends StatelessWidget {
 
 class EditDiaryScreen extends StatefulWidget {
   final CheckIn checkIn;
+  final String userId;
 
-  const EditDiaryScreen({super.key, required this.checkIn});
+  const EditDiaryScreen({
+    super.key,
+    required this.checkIn,
+    required this.userId,
+  });
 
   @override
   State<EditDiaryScreen> createState() => _EditDiaryScreenState();
@@ -217,6 +319,7 @@ class _EditDiaryScreenState extends State<EditDiaryScreen> {
   late TextEditingController _diaryController;
   late TextEditingController _titleController;
   DateTime? _editTimestamp;
+  final FirebaseService _firebaseService = FirebaseService.instance; // 添加这行
 
   @override
   void initState() {
@@ -234,19 +337,30 @@ class _EditDiaryScreenState extends State<EditDiaryScreen> {
     }
 
     try {
-      final updatedCheckIn = CheckIn(
-        id: widget.checkIn.id,
-        emoji: widget.checkIn.emoji,
-        diary: _diaryController.text.trim(),
-        title: _titleController.text.isEmpty
+      if (widget.checkIn.id == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cannot update: No entry ID')),
+        );
+        return;
+      }
+
+      // 创建更新数据
+      final updates = {
+        'diary': _diaryController.text.trim(),
+        'title': _titleController.text.isEmpty
             ? null
             : _titleController.text.trim(),
-        aiResponse: widget.checkIn.aiResponse,
-        timestamp: widget.checkIn.timestamp,
-        emotion: widget.checkIn.emotion, // Make sure to include emotion field
-      );
+      };
 
-      await DatabaseService.instance.updateCheckIn(updatedCheckIn);
+      // 移除 null 值
+      updates.removeWhere((key, value) => value == null);
+
+      // 修改这行
+      await _firebaseService.updateCheckIn(
+        widget.userId,
+        widget.checkIn.id!,
+        updates,
+      );
 
       if (!mounted) return;
 

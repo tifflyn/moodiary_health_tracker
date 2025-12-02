@@ -1,7 +1,8 @@
 // lib/screens/logemotionscreen.dart
 import 'package:flutter/material.dart';
 import '../models/emotionlog.dart';
-import '../services/database_service.dart';
+import '../services/firebase_service.dart'; // 修改这行
+import 'package:firebase_auth/firebase_auth.dart'; // 添加这行
 
 class LogEmotionScreen extends StatefulWidget {
   const LogEmotionScreen({super.key});
@@ -14,6 +15,14 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
   String? selectedEnergy; // store the energy "name"
   int intensity = 3; // default (will be set when user taps an energy)
   final TextEditingController noteController = TextEditingController();
+  final FirebaseService _firebaseService = FirebaseService.instance; // 添加这行
+  User? _currentUser; // 添加这行
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUser = FirebaseAuth.instance.currentUser; // 获取当前用户
+  }
 
   final energies = [
     {
@@ -21,35 +30,35 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
       'label': 'Totally drained.',
       'icon': Icons.battery_0_bar,
       'color': Colors.red,
-      'value': 1
+      'value': 1,
     },
     {
       'name': 'running_low',
       'label': 'Running low...',
       'icon': Icons.battery_1_bar,
       'color': Colors.orange,
-      'value': 2
+      'value': 2,
     },
     {
       'name': 'medium_energy',
       'label': 'Medium energy',
       'icon': Icons.battery_2_bar,
       'color': Colors.green,
-      'value': 3
+      'value': 3,
     },
     {
       'name': 'energized',
       'label': 'Energized!',
       'icon': Icons.battery_3_bar,
       'color': Colors.blue,
-      'value': 4
+      'value': 4,
     },
     {
       'name': 'fully_charged',
       'label': 'Fully charged!!!',
       'icon': Icons.battery_full,
       'color': Colors.purple,
-      'value': 5
+      'value': 5,
     },
   ];
 
@@ -61,6 +70,13 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
       return;
     }
 
+    if (_currentUser == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please sign in first')));
+      return;
+    }
+
     // intensity already set when selecting; ensure it's consistent
     final log = EmotionLog(
       emotion: selectedEnergy!,
@@ -69,13 +85,21 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
       dateTime: DateTime.now(),
     );
 
-    await DatabaseService.instance.insertEmotion(log);
+    try {
+      await _firebaseService.addEmotionLog(_currentUser!.uid, log); // 修改这行
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Entry saved!')),
-      );
-      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Entry saved!')));
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving: $e')));
+      }
     }
   }
 
@@ -123,10 +147,10 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
-                                color: color.withValues(alpha:0.25),
+                                color: color.withValues(alpha: 0.25),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4),
-                              )
+                              ),
                             ]
                           : [],
                     ),
@@ -154,7 +178,6 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
             ),
 
             // NOTE: intensity slider removed intentionally per request.
-
             const SizedBox(height: 32),
             const Text(
               'Notes (Optional)',
@@ -166,7 +189,9 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
               maxLines: 5,
               decoration: InputDecoration(
                 hintText: 'What triggered this feeling? Any thoughts...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.purple, width: 2),
@@ -181,11 +206,17 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
                 onPressed: saveEmotion,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purple,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: const Text(
                   'Save Entry',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),

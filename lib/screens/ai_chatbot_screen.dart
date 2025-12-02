@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // 添加这行
 import '../models/chat_message.dart';
 import '../models/emotionlog.dart';
 import '../services/ai_service.dart';
-import '../services/database_service.dart';
+import '../services/firebase_service.dart'; // 修改这行
 
 class AIChatbotScreen extends StatefulWidget {
   const AIChatbotScreen({super.key});
@@ -16,19 +18,40 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
   final ScrollController _scrollController = ScrollController();
   List<ChatMessage> messages = [];
   bool isLoading = false;
+  final FirebaseService _firebaseService = FirebaseService.instance; // 添加这行
+  User? _currentUser; // 添加这行
+  StreamSubscription<List<ChatMessage>>? _chatSubscription; // 添加这行
 
   @override
   void initState() {
     super.initState();
+    _currentUser = FirebaseAuth.instance.currentUser;
     _loadChatHistory();
   }
 
   Future<void> _loadChatHistory() async {
-    final history = await DatabaseService.instance.getChatHistory(limit: 50);
-    setState(() {
-      messages = history.reversed.toList();
-    });
-    _scrollToBottom();
+    if (_currentUser == null) return;
+
+    try {
+      _chatSubscription?.cancel();
+      _chatSubscription = _firebaseService
+          .getChatMessages(_currentUser!.uid, limit: 50)
+          .listen(
+            (chatMessages) {
+              if (mounted) {
+                setState(() {
+                  messages = chatMessages.reversed.toList(); // ✅ 添加 reversed
+                });
+                _scrollToBottom();
+              }
+            },
+            onError: (error) {
+              debugPrint('Error loading chat history: $error');
+            },
+          );
+    } catch (e) {
+      debugPrint('Error loading chat history: $e');
+    }
   }
 
   void _scrollToBottom() {
@@ -45,6 +68,12 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
 
   Future<void> _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
+    if (_currentUser == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please sign in first')));
+      return;
+    }
 
     final messageText = _messageController.text;
     _messageController.clear();
@@ -62,20 +91,25 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
 
     String aiResponse = '';
     try {
-      // Try to save user message (non-critical if it fails)
+      // 保存用户消息到 Firebase
       try {
-        await DatabaseService.instance.insertChatMessage(userMessage);
+        await _firebaseService.addChatMessage(_currentUser!.uid, userMessage);
       } catch (dbError) {
-        debugPrint('Warning: Could not save user message to database: $dbError');
+        debugPrint(
+          'Warning: Could not save user message to Firebase: $dbError',
+        );
       }
       _scrollToBottom();
 
       // Get recent emotions for context (non-critical if it fails)
       List<EmotionLog>? recentEmotions;
       try {
-        recentEmotions = await DatabaseService.instance.getEmotionsForDateRange(
-          DateTime.now().subtract(const Duration(days: 7)),
-          DateTime.now(),
+        final end = DateTime.now();
+        final start = end.subtract(const Duration(days: 7));
+        recentEmotions = await _firebaseService.getEmotionsForDateRange(
+          _currentUser!.uid,
+          start,
+          end,
         );
       } catch (dbError) {
         debugPrint('Warning: Could not load recent emotions: $dbError');
@@ -88,42 +122,56 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
           userMessage.message,
           recentEmotions,
         );
-        
+
         // Show API error warnings to help debug
         final apiError = AIService.instance.lastApiError;
         if (apiError != null && mounted) {
           String errorMessage = 'Using enhanced local AI';
           bool showError = false;
-          
-          if (apiError.contains('API key') || apiError.contains('401') || apiError.contains('Unauthorized') || apiError.contains('403')) {
+
+          if (apiError.contains('API key') ||
+              apiError.contains('401') ||
+              apiError.contains('Unauthorized') ||
+              apiError.contains('403')) {
             if (apiError.contains('Gemini')) {
-              errorMessage = 'API key error: Check your Gemini API key in main.dart. Using local AI for now.';
+              errorMessage =
+                  'API key error: Check your Gemini API key in main.dart. Using local AI for now.';
             } else {
-              errorMessage = 'API key error: Check your API key in main.dart. Using local AI for now.';
+              errorMessage =
+                  'API key error: Check your API key in main.dart. Using local AI for now.';
             }
             showError = true;
           } else if (apiError.contains('Network error')) {
-            errorMessage = 'Network error: Check your internet connection. Using local AI for now.';
+            errorMessage =
+                'Network error: Check your internet connection. Using local AI for now.';
             showError = true;
-          } else if (apiError.contains('Rate limit') || apiError.contains('429')) {
-            errorMessage = 'Rate limit exceeded: Please wait a moment. Using local AI for now.';
+          } else if (apiError.contains('Rate limit') ||
+              apiError.contains('429')) {
+            errorMessage =
+                'Rate limit exceeded: Please wait a moment. Using local AI for now.';
             showError = true;
-          } else if (apiError.contains('quota') || apiError.contains('exceeded') || apiError.contains('insufficient_quota')) {
+          } else if (apiError.contains('quota') ||
+              apiError.contains('exceeded') ||
+              apiError.contains('insufficient_quota')) {
             if (apiError.contains('Gemini')) {
-              errorMessage = 'Gemini quota exceeded: Check usage at aistudio.google.com/app/apikey. Using local AI for now.';
+              errorMessage =
+                  'Gemini quota exceeded: Check usage at aistudio.google.com/app/apikey. Using local AI for now.';
             } else {
-              errorMessage = 'OpenAI quota exceeded: Add credits at platform.openai.com/account/billing. Using local AI for now.';
+              errorMessage =
+                  'OpenAI quota exceeded: Add credits at platform.openai.com/account/billing. Using local AI for now.';
             }
             showError = true;
           } else if (apiError.contains('timeout')) {
             if (apiError.contains('Gemini')) {
-              errorMessage = 'Request timeout: Gemini API took too long. Using local AI for now.';
+              errorMessage =
+                  'Request timeout: Gemini API took too long. Using local AI for now.';
             } else {
-              errorMessage = 'Request timeout: API took too long. Using local AI for now.';
+              errorMessage =
+                  'Request timeout: API took too long. Using local AI for now.';
             }
             showError = true;
           }
-          
+
           if (showError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -137,7 +185,8 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
       } catch (aiError) {
         // If AI service fails completely, use a basic fallback
         debugPrint('AI service error: $aiError');
-        aiResponse = '''Thank you for sharing with me. I'm here to listen and support you.
+        aiResponse =
+            '''Thank you for sharing with me. I'm here to listen and support you.
 
 It takes courage to reach out. Whatever you're experiencing is valid.
 
@@ -146,7 +195,8 @@ Would you like to talk more about what's on your mind?''';
 
       // Ensure we have a response
       if (aiResponse.isEmpty) {
-        aiResponse = '''Thank you for your message. I'm here to listen and support you.
+        aiResponse =
+            '''Thank you for your message. I'm here to listen and support you.
 
 How can I help you today?''';
       }
@@ -166,7 +216,7 @@ How can I help you today?''';
 
       // Try to save AI message (non-critical if it fails)
       try {
-        await DatabaseService.instance.insertChatMessage(aiMessage);
+        await _firebaseService.addChatMessage(_currentUser!.uid, aiMessage);
       } catch (dbError) {
         debugPrint('Warning: Could not save AI message to database: $dbError');
       }
@@ -174,7 +224,7 @@ How can I help you today?''';
     } catch (e) {
       // Handle any other errors that occur during message sending
       debugPrint('Error sending message: $e');
-      
+
       if (!mounted) return;
 
       setState(() {
@@ -184,31 +234,35 @@ How can I help you today?''';
       // Show user-friendly error message
       String errorMessage = 'Unable to send message. Please try again.';
       final errorStr = e.toString().toLowerCase();
-      
-      if (errorStr.contains('network error') || 
-          errorStr.contains('socketexception') || 
+
+      if (errorStr.contains('network error') ||
+          errorStr.contains('socketexception') ||
           errorStr.contains('failed host lookup') ||
           errorStr.contains('connection')) {
         errorMessage = 'Network error: Please check your internet connection';
-      } else if (errorStr.contains('api key') || 
-                 errorStr.contains('401') || 
-                 errorStr.contains('403') ||
-                 errorStr.contains('unauthorized') ||
-                 errorStr.contains('invalid api key')) {
+      } else if (errorStr.contains('api key') ||
+          errorStr.contains('401') ||
+          errorStr.contains('403') ||
+          errorStr.contains('unauthorized') ||
+          errorStr.contains('invalid api key')) {
         if (errorStr.contains('gemini')) {
-          errorMessage = 'API key error: Please check your Gemini API key in main.dart';
+          errorMessage =
+              'API key error: Please check your Gemini API key in main.dart';
         } else {
-          errorMessage = 'API key error: Please check your API key in main.dart';
+          errorMessage =
+              'API key error: Please check your API key in main.dart';
         }
-      } else if (errorStr.contains('rate limit') || 
-                 errorStr.contains('429') ||
-                 errorStr.contains('quota')) {
-        errorMessage = 'Rate limit exceeded: Please wait a moment and try again';
+      } else if (errorStr.contains('rate limit') ||
+          errorStr.contains('429') ||
+          errorStr.contains('quota')) {
+        errorMessage =
+            'Rate limit exceeded: Please wait a moment and try again';
       } else if (errorStr.contains('timeout')) {
         errorMessage = 'Request timed out. Please try again.';
       } else {
         // For debugging - show full error in console but user-friendly message in UI
-        errorMessage = 'Unable to process message. The enhanced local AI will be used instead.';
+        errorMessage =
+            'Unable to process message. The enhanced local AI will be used instead.';
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -256,8 +310,11 @@ How can I help you today?''';
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.chat_bubble_outline,
-                            size: 80, color: Colors.grey[300]),
+                        Icon(
+                          Icons.chat_bubble_outline,
+                          size: 80,
+                          color: Colors.grey[300],
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           'Start a conversation',
@@ -388,25 +445,31 @@ How can I help you today?''';
 
   Widget _buildMessageBubble(ChatMessage message) {
     final isUser = message.isUser;
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isUser) ...[
             CircleAvatar(
               backgroundColor: Colors.grey[200],
-              child: const Icon(Icons.psychology, color: Colors.purple, size: 20),
+              child: const Icon(
+                Icons.psychology,
+                color: Colors.purple,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 8),
           ],
           Flexible(
             child: Column(
-              crossAxisAlignment:
-                  isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment: isUser
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -428,10 +491,7 @@ How can I help you today?''';
                 const SizedBox(height: 4),
                 Text(
                   DateFormat('h:mm a').format(message.timestamp),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey[500],
-                  ),
+                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                 ),
               ],
             ),
@@ -450,6 +510,7 @@ How can I help you today?''';
 
   @override
   void dispose() {
+    _chatSubscription?.cancel(); // 添加这行
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();

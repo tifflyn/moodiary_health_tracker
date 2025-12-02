@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../models/emotionlog.dart';
-import '../services/database_service.dart';
 import 'logemotionscreen.dart';
 import 'ai_chatbot_screen.dart';
 import 'self_care/daily_recommendation_screen.dart';
@@ -12,6 +12,9 @@ import 'check_in/check_in_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/charts.dart';
+import '../services/firebase_service.dart'; // 添加这一行
+import 'dart:developer'; // 添加这行，用于 debugPrint
+import '../models/check_in.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,15 +34,88 @@ class _HomeScreenState extends State<HomeScreen> {
   bool checkInCompleted = false;
   bool breathingExerciseCompleted = false;
 
+  StreamSubscription<List<EmotionLog>>? _emotionSubscription;
+
   @override
   void initState() {
     super.initState();
+    // 先立即加载一次
     loadWeekData();
-    loadCompletionStates();
+    // 然后设置实时监听
+    _setupRealTimeListener();
+  }
+
+  // 添加实时监听方法
+  void _setupRealTimeListener() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.user.id;
+
+    if (userId.isEmpty) return;
+
+    try {
+      _emotionSubscription?.cancel();
+      _emotionSubscription = FirebaseService.instance
+          .getEmotionLogs(userId)
+          .listen(
+            (emotions) {
+              if (mounted) {
+                _processEmotions(emotions);
+              }
+            },
+            onError: (error) {
+              debugPrint('Error in emotion stream: $error');
+            },
+          );
+    } catch (e) {
+      debugPrint('Error setting up real-time listener: $e');
+    }
+  }
+
+  // 处理情绪数据的方法
+  void _processEmotions(List<EmotionLog> emotions) {
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final endOfWeek = startOfWeek.add(
+      const Duration(days: 6, hours: 23, minutes: 59),
+    );
+
+    // 过滤出本周的数据
+    final weekEmotions = emotions.where((log) {
+      return log.dateTime.isAfter(startOfWeek) &&
+          log.dateTime.isBefore(endOfWeek);
+    }).toList();
+
+    if (mounted) {
+      setState(() {
+        weekLogs = weekEmotions;
+        isLoading = false;
+
+        // 检查今天是否记录了情绪（用于 TodoList）
+        final todayLogs = _getTodayLogsFromList(weekEmotions);
+        emotionLogged = todayLogs.isNotEmpty;
+      });
+    }
+  }
+
+  // 从列表中获取今天的日志
+  List<EmotionLog> _getTodayLogsFromList(List<EmotionLog> allLogs) {
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    return allLogs
+        .where((log) => DateFormat('yyyy-MM-dd').format(log.dateTime) == today)
+        .toList();
   }
 
   Future<void> loadWeekData() async {
     setState(() => isLoading = true);
+
+    // 获取当前用户ID
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.user.id;
+
+    if (userId.isEmpty) {
+      setState(() => isLoading = false);
+      return;
+    }
 
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
@@ -47,39 +123,141 @@ class _HomeScreenState extends State<HomeScreen> {
       const Duration(days: 6, hours: 23, minutes: 59),
     );
 
-    final logs = await DatabaseService.instance.getEmotionsForDateRange(
-      startOfWeek,
-      endOfWeek,
-    );
+    try {
+      // 切换到 FirebaseService
+      final logs = await FirebaseService.instance.getEmotionsForDateRange(
+        userId,
+        startOfWeek,
+        endOfWeek,
+      );
 
-    if (mounted) {
-      setState(() {
-        weekLogs = logs;
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          weekLogs = logs;
+          isLoading = false;
+
+          // 检查今天是否记录了情绪
+          final todayLogs = _getTodayLogsFromList(logs);
+          emotionLogged = todayLogs.isNotEmpty;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading week data from Firebase: $e');
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+      // 可选：显示错误提示给用户
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load data: $e')));
     }
   }
 
-  // Load completion states from shared preferences or database
+  // 在 dispose 方法中添加
+  @override
+  void dispose() {
+    _emotionSubscription?.cancel();
+    super.dispose();
+  }
+
   Future<void> loadCompletionStates() async {
-    // You'll need to implement this based on your storage solution
-    // For now, using mock data
-    setState(() {
-      emotionLogged = false;
-      checkInCompleted = false;
-      breathingExerciseCompleted = false;
-    });
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.user.id;
+
+    if (userId.isEmpty) return;
+
+    try {
+      // 1. Check if emotions were logged today
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+      final todayEmotions = await FirebaseService.instance
+          .getEmotionsForDateRange(userId, todayStart, todayEnd);
+
+      // 2. Check if there are check-ins today
+      List<CheckIn> todayCheckIns = [];
+      try {
+        // Try using the new getTodayCheckIns method
+        todayCheckIns = await FirebaseService.instance.getTodayCheckIns(userId);
+        debugPrint('✅ Today\'s check-ins count: ${todayCheckIns.length}');
+      } catch (e) {
+        debugPrint('⚠️ Failed to use getTodayCheckIns: $e');
+        // Fallback: use getRecentCheckIns and filter
+        final recentCheckIns = await FirebaseService.instance.getRecentCheckIns(
+          userId,
+          days: 1,
+        );
+        debugPrint('📊 Recent 1-day check-ins: ${recentCheckIns.length}');
+
+        // Filter out today's records
+        todayCheckIns = recentCheckIns.where((checkIn) {
+          final checkInDate = DateTime(
+            checkIn.timestamp.year,
+            checkIn.timestamp.month,
+            checkIn.timestamp.day,
+          );
+          final isToday = checkInDate == todayStart;
+          if (isToday) {
+            debugPrint(
+              '📅 Found today\'s check-in: ${checkIn.title ?? "No title"} at ${checkIn.timestamp}',
+            );
+          }
+          return isToday;
+        }).toList();
+      }
+
+      // 3. Check if today's recommendation is completed
+      final todayRecommendation = await FirebaseService.instance
+          .getTodayRecommendation(userId);
+
+      if (mounted) {
+        setState(() {
+          emotionLogged = todayEmotions.isNotEmpty;
+          checkInCompleted = todayCheckIns.isNotEmpty; // ✅ Fixed here
+          breathingExerciseCompleted = todayRecommendation?.completed ?? false;
+        });
+
+        // Add debug output
+        debugPrint('''
+✅ Todo status updated:
+  Emotion log: ${todayEmotions.isNotEmpty} (${todayEmotions.length} items)
+  Check-ins: ${todayCheckIns.isNotEmpty} (${todayCheckIns.length} items)
+  Breathing exercise: ${todayRecommendation?.completed ?? false}
+''');
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading completion states: $e');
+    }
   }
 
-  // Save completion states
-  Future<void> saveCompletionStates() async {
-    // Implement saving to shared preferences or database
-  }
+  Future<void> deleteLog(String? emotionId) async {
+    // 参数改为 String?
+    if (emotionId == null) return;
 
-  Future<void> deleteLog(int? id) async {
-    if (id == null) return;
-    await DatabaseService.instance.deleteEmotion(id);
-    loadWeekData();
+    // 获取当前用户ID
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.user.id;
+
+    if (userId.isEmpty) return;
+
+    try {
+      // 切换到 FirebaseService
+      await FirebaseService.instance.deleteEmotion(userId, emotionId);
+
+      // 重新加载数据
+      await loadWeekData();
+
+      // 显示成功提示
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Emotion entry deleted')));
+    } catch (e) {
+      debugPrint('Error deleting emotion from Firebase: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+    }
   }
 
   String getEnergyLabel(String emotion) {
@@ -303,16 +481,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
 
                       // Refresh data when returning from LogEmotionScreen
-                      await loadWeekData();
-
-                      // Check if any emotions were logged today to mark as completed
-                      final todayLogs = getTodayLogs();
-                      if (todayLogs.isNotEmpty) {
-                        setState(() {
-                          emotionLogged = true;
-                        });
-                        saveCompletionStates();
-                      }
+                      await loadCompletionStates();
                     },
                   ),
 
@@ -334,10 +503,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       // Check if check-in was submitted
                       if (result == true) {
-                        setState(() {
-                          checkInCompleted = true;
-                        });
-                        saveCompletionStates();
+                        // CheckIn 完成后，重新加载状态
+                        await loadCompletionStates();
                       }
                     },
                   ),
@@ -361,10 +528,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       // Check if breathing exercise was completed
                       if (result == true) {
-                        setState(() {
-                          breathingExerciseCompleted = true;
-                        });
-                        saveCompletionStates();
+                        // 重新加载完成状态
+                        await loadCompletionStates();
                       }
                     },
                   ),
@@ -500,7 +665,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
 
                         if (confirm == true) {
-                          deleteLog(log.id);
+                          deleteLog(log.id); // 这里现在传递的是 String? id
                         }
                       },
                     ),
@@ -661,16 +826,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
 
                 // Refresh data when returning
-                await loadWeekData();
-
-                // Check if any emotions were logged today
-                final todayLogs = getTodayLogs();
-                if (todayLogs.isNotEmpty) {
-                  setState(() {
-                    emotionLogged = true;
-                  });
-                  saveCompletionStates();
-                }
+                await loadCompletionStates();
               },
               backgroundColor: Colors.purple,
               icon: const Icon(Icons.add, color: Colors.white),

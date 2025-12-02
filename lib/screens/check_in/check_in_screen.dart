@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // 添加这行
 import '../../models/check_in.dart';
-import '../../services/database_service.dart';
+import '../../services/firebase_service.dart'; // 修改这行
 import '../../services/ai_service.dart';
 
 class CheckInScreen extends StatefulWidget {
@@ -16,6 +17,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
   final TextEditingController _titleController = TextEditingController();
   bool isLoading = false;
   CheckIn? generatedCheckIn;
+  final FirebaseService _firebaseService = FirebaseService.instance; // 添加这行
+  User? _currentUser; // 添加这行
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUser = FirebaseAuth.instance.currentUser;
+  }
 
   final emojis = [
     {'emoji': '😊', 'label': 'Happy', 'emotion': 'happy'},
@@ -47,6 +56,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
       return;
     }
 
+    if (_currentUser == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please sign in first')));
+      return;
+    }
+
     setState(() => isLoading = true);
 
     try {
@@ -66,7 +83,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
         emotion: _selectedEmotion, // 新增 emotion
       );
 
-      await DatabaseService.instance.insertCheckIn(checkIn);
+      await _firebaseService.addCheckIn(_currentUser!.uid, checkIn);
 
       if (!mounted) return;
 

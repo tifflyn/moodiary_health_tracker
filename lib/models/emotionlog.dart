@@ -1,5 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class EmotionLog {
-  final int? id;
+  final String? id;
   final String emotion;
   final int intensity;
   final String note;
@@ -16,7 +18,7 @@ class EmotionLog {
   // Convert EmotionLog to Map for database
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
+      // 不存储 id 字段到 Firestore，因为它是文档ID本身
       'emotion': emotion,
       'intensity': intensity,
       'note': note,
@@ -32,6 +34,18 @@ class EmotionLog {
       intensity: map['intensity'],
       note: map['note'],
       dateTime: DateTime.parse(map['dateTime']),
+    );
+  }
+
+  // 添加一个辅助方法，用于从 Firestore 文档创建 EmotionLog
+  factory EmotionLog.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return EmotionLog(
+      id: doc.id, // 使用 Firestore 文档ID
+      emotion: data['emotion'],
+      intensity: data['intensity'],
+      note: data['note'],
+      dateTime: DateTime.parse(data['dateTime']),
     );
   }
 }

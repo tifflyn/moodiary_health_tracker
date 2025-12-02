@@ -156,6 +156,20 @@ class FirebaseService {
         .add(log.toMap());
   }
 
+  // 在 Emotion logs 部分，添加更新方法
+  Future<void> updateEmotionLog(
+    String userId,
+    String emotionId, // Firestore 文档ID
+    Map<String, dynamic> updates,
+  ) async {
+    await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('emotions')
+        .doc(emotionId)
+        .update(updates);
+  }
+
   Stream<List<EmotionLog>> getEmotionLogs(String userId) {
     return _firestore
         .collection('users')
@@ -165,8 +179,7 @@ class FirebaseService {
         .snapshots()
         .map(
           (snapshot) => snapshot.docs.map((doc) {
-            final data = doc.data();
-            return EmotionLog.fromMap(data);
+            return EmotionLog.fromFirestore(doc); // 使用 fromFirestore
           }).toList(),
         );
   }
@@ -185,7 +198,9 @@ class FirebaseService {
         .orderBy('dateTime')
         .get();
 
-    return snapshot.docs.map((doc) => EmotionLog.fromMap(doc.data())).toList();
+    return snapshot.docs.map((doc) {
+      return EmotionLog.fromFirestore(doc); // 使用新的工厂方法
+    }).toList();
   }
 
   Future<void> deleteEmotion(String userId, String emotionId) async {
@@ -209,14 +224,24 @@ class FirebaseService {
   Future<void> updateCheckIn(
     String userId,
     String checkInId,
-    CheckIn checkIn,
+    Map<String, dynamic> updates, // 改为通用 updates
   ) async {
     await _firestore
         .collection('users')
         .doc(userId)
         .collection('check_ins')
         .doc(checkInId)
-        .update(checkIn.toMap());
+        .update(updates);
+  }
+
+  // 添加删除 CheckIn 的方法
+  Future<void> deleteCheckIn(String userId, String checkInId) async {
+    await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('check_ins')
+        .doc(checkInId)
+        .delete();
   }
 
   Stream<List<CheckIn>> getCheckIns(String userId) {
@@ -228,9 +253,8 @@ class FirebaseService {
         .snapshots()
         .map(
           (snapshot) => snapshot.docs.map((doc) {
-            final data = doc.data();
-            data['id'] = doc.id; // Include document ID
-            return CheckIn.fromMap(data);
+            // 直接使用 fromFirestore 方法
+            return CheckIn.fromFirestore(doc);
           }).toList(),
         );
   }
@@ -246,10 +270,34 @@ class FirebaseService {
         .get();
 
     return snapshot.docs.map((doc) {
-      final data = doc.data();
-      data['id'] = doc.id;
-      return CheckIn.fromMap(data);
+      return CheckIn.fromFirestore(doc); // 使用 fromFirestore
     }).toList();
+  }
+
+  // 在 FirebaseService 中添加
+  Future<List<CheckIn>> getTodayCheckIns(String userId) async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    try {
+      // 转换为字符串格式（因为您的 timestamp 存储为字符串）
+      final startStr = startOfDay.toIso8601String();
+      final endStr = endOfDay.toIso8601String();
+
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('check_ins')
+          .where('timestamp', isGreaterThanOrEqualTo: startStr)
+          .where('timestamp', isLessThanOrEqualTo: endStr)
+          .get();
+
+      return snapshot.docs.map((doc) => CheckIn.fromFirestore(doc)).toList();
+    } catch (e) {
+      print('Error getting today check-ins: $e');
+      return [];
+    }
   }
 
   // Chat messages
@@ -259,6 +307,16 @@ class FirebaseService {
         .doc(userId)
         .collection('chat_messages')
         .add(message.toMap());
+  }
+
+  // 在 Chat messages 部分，添加删除方法（可选）
+  Future<void> deleteChatMessage(String userId, String messageId) async {
+    await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('chat_messages')
+        .doc(messageId)
+        .delete();
   }
 
   Stream<List<ChatMessage>> getChatMessages(String userId, {int limit = 50}) {
@@ -271,8 +329,7 @@ class FirebaseService {
         .snapshots()
         .map(
           (snapshot) => snapshot.docs.map((doc) {
-            final data = doc.data();
-            return ChatMessage.fromMap(data);
+            return ChatMessage.fromFirestore(doc); // ✅ 改为 fromFirestore
           }).toList(),
         );
   }
