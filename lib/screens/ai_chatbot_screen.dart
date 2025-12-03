@@ -27,6 +27,8 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
     super.initState();
     _currentUser = FirebaseAuth.instance.currentUser;
     _loadChatHistory();
+
+    AIService.instance.setChatbotMode();
   }
 
   Future<void> _loadChatHistory() async {

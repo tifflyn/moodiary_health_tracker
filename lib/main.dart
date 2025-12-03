@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // 添加这行
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/welcome_screen.dart';
@@ -10,6 +11,9 @@ void main() async {
   // 确保 Flutter widgets 初始化
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 🎯 加载环境变量（必须在 Firebase 初始化之前）
+  await dotenv.load(fileName: ".env");
+
   // 添加 Firebase 初始化
   try {
     await Firebase.initializeApp();
@@ -18,10 +22,20 @@ void main() async {
     debugPrint('❌ Firebase initialization failed: $e');
   }
 
-  // IMPORTANT: Clear any old API keys and set Gemini
+  // 🎯 使用新的 Gemini Chatbot 配置
   AIService.instance.clearApiKeys();
-  AIService.instance.setProvider('gemini');
-  AIService.instance.setGeminiApiKey('AIzaSyA0QiOoXJmIAsKB-KFfHG6FE0axa1eJdSc');
+  AIService.instance.setChatbotMode(); // 🚀 设置为 chatbot 模式
+
+  // 🎯 使用 .env 中的新 API 密钥
+  final geminiApiKey =
+      dotenv.env['GEMINI_API_KEY'] ??
+      'AIzaSyDkdff1oUen4H_Z9zoh-TCdW4soDUwTL70'; // 你的新密钥
+
+  AIService.instance.setGeminiApiKey(geminiApiKey);
+
+  debugPrint(
+    '🎯 Using new Gemini Chatbot with key: ${geminiApiKey.substring(0, 10)}...',
+  );
 
   runApp(
     ChangeNotifierProvider(
