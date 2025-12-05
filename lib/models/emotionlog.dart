@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 class EmotionLog {
   String? id;   //make sure this is nullable
@@ -53,10 +54,14 @@ class EmotionLog {
       } else {
         // 如果都不是，使用当前时间
         parsedDateTime = DateTime.now();
-        print('⚠️  Unexpected dateTime format: ${data['dateTime']}');
+        if (kDebugMode) {
+        debugPrint('⚠️  Unexpected dateTime format: ${data['dateTime']}');
+        }
       }
     } catch (e) {
+      if (kDebugMode) {
       print('❌ Error parsing dateTime: $e, using current time');
+      }
       parsedDateTime = DateTime.now();
     }
     
