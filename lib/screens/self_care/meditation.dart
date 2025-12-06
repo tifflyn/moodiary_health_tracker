@@ -132,7 +132,7 @@ class _MeditationScreenState extends State<MeditationScreen>
                           crossAxisCount: 2,
                           crossAxisSpacing: 16,
                           mainAxisSpacing: 16,
-                          childAspectRatio: 0.85,
+                          childAspectRatio: 1.0,
                         ),
                     delegate: SliverChildBuilderDelegate(
                       (context, index) => _buildDreamyMeditationCard(index),
@@ -258,92 +258,104 @@ class _MeditationScreenState extends State<MeditationScreen>
     );
   }
 
-  Widget _buildDreamyMeditationCard(int index) {
-    final List<Map<String, dynamic>> meditations = [
-      {
-        'title': 'Stellar Sleep',
-        'desc': 'Drift into cosmic dreams',
-        'icon': Icons.nightlight_round,
-        'gradient': [const Color(0xFF667EEA), const Color(0xFF764BA2)],
-        'videoId': 'g0jfhRcXtLQ?si=M--kU1H2jrg_MdYQ',
-        'emoji': '🌙',
-      },
-      {
-        'title': 'Galactic Calm',
-        'desc': 'Find peace in the void',
-        'icon': Icons.self_improvement,
-        'gradient': [const Color(0xFF9C27B0), const Color(0xFF2196F3)],
-        'videoId': 'tuiQxBB67wI?si=4u1umssqihSyThU0',
-        'emoji': '🌀',
-      },
-      {
-        'title': 'Nature\'s Orbit',
-        'desc': 'Earth harmony in space',
-        'icon': Icons.park,
-        'gradient': [const Color(0xFF4CAF50), const Color(0xFF2196F3)],
-        'videoId': 'AImuCtIokl0?si=IfXVr4pedNz1psFo',
-        'emoji': '🌍',
-      },
-      {
-        'title': 'Nebula Focus',
-        'desc': 'Clarity in cosmic clouds',
-        'icon': Icons.lightbulb_outline,
-        'gradient': [const Color(0xFFFF416C), const Color(0xFFFF4B2B)],
-        'videoId': 'inpok4MKVLM?si=5s7gG7U6W2Vq6q_Q',
-        'emoji': '✨',
-      },
-      {
-        'title': 'Astral Breath',
-        'desc': 'Breathe with the universe',
-        'icon': Icons.air,
-        'gradient': [const Color(0xFF0062FF), const Color(0xFF00E0FF)],
-        'videoId': 'd74K6IhXQh8?si=HdQ2vXvzqM3m3k6f',
-        'emoji': '🌬️',
-      },
-      {
-        'title': 'Celestial Flow',
-        'desc': 'Move with cosmic energy',
-        'icon': Icons.waves,
-        'gradient': [const Color(0xFFF7971E), const Color(0xFFFFD200)],
-        'videoId': 'z3U0udLH974?si=8YH7q5X5X5X5X5X5',
-        'emoji': '⚡',
-      },
-    ];
+Widget _buildDreamyMeditationCard(int index) {
+  final List<Map<String, dynamic>> meditations = [
+    {
+      'title': 'Stellar Sleep',
+      'desc': 'Drift into cosmic dreams',
+      'icon': Icons.nightlight_round,
+      'gradient': [const Color(0xFF667EEA), const Color(0xFF764BA2)],
+      'videoId': 'g0jfhRcXtLQ?si=M--kU1H2jrg_MdYQ',
+      'emoji': '🌙',
+    },
+    {
+      'title': 'Galactic Calm',
+      'desc': 'Find peace in the void',
+      'icon': Icons.self_improvement,
+      'gradient': [const Color(0xFF9C27B0), const Color(0xFF2196F3)],
+      'videoId': 'tuiQxBB67wI?si=4u1umssqihSyThU0',
+      'emoji': '🌀',
+    },
+    {
+      'title': 'Nature\'s Orbit',
+      'desc': 'Earth harmony in space',
+      'icon': Icons.park,
+      'gradient': [const Color(0xFF4CAF50), const Color(0xFF2196F3)],
+      'videoId': 'AImuCtIokl0?si=IfXVr4pedNz1psFo',
+      'emoji': '🌍',
+    },
+    {
+      'title': 'Nebula Focus',
+      'desc': 'Clarity in cosmic clouds',
+      'icon': Icons.lightbulb_outline,
+      'gradient': [const Color(0xFFFF416C), const Color(0xFFFF4B2B)],
+      'videoId': 'inpok4MKVLM?si=5s7gG7U6W2Vq6q_Q',
+      'emoji': '✨',
+    },
+    {
+      'title': 'Astral Breath',
+      'desc': 'Breathe with the universe',
+      'icon': Icons.air,
+      'gradient': [const Color(0xFF0062FF), const Color(0xFF00E0FF)],
+      'videoId': 'd74K6IhXQh8?si=HdQ2vXvzqM3m3k6f',
+      'emoji': '🌬️',
+    },
+    {
+      'title': 'Celestial Flow',
+      'desc': 'Move with cosmic energy',
+      'icon': Icons.waves,
+      'gradient': [const Color(0xFFF7971E), const Color(0xFFFFD200)],
+      'videoId': 'z3U0udLH974?si=8YH7q5X5X5X5X5X5',
+      'emoji': '⚡',
+    },
+  ];
 
-    final meditation = meditations[index % meditations.length];
+  final meditation = meditations[index % meditations.length];
 
-    return AnimatedBuilder(
-      animation: _nebulaController,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, sin(_nebulaAnimation.value * 2 * pi + index) * 8),
-          child: GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                PageRouteBuilder(
-                  transitionDuration: const Duration(milliseconds: 800),
-                  pageBuilder: (_, __, ___) => YouTubeMeditationScreen(
-                    videoId: meditation['videoId']!,
-                    title: meditation['title']!,
-                    gradientColors: meditation['gradient']!,
-                  ),
-                  transitionsBuilder: (_, animation, __, child) {
-                    return FadeTransition(
-                      opacity: CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.easeInOutCubic,
-                      ),
-                      child: child,
-                    );
-                  },
+  return AnimatedBuilder(
+    animation: _nebulaController,
+    builder: (context, child) {
+      return Transform.translate(
+        offset: Offset(0, sin(_nebulaAnimation.value * 2 * pi + index) * 8),
+        child: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              PageRouteBuilder(
+                transitionDuration: const Duration(milliseconds: 800),
+                pageBuilder: (_, __, ___) => YouTubeMeditationScreen(
+                  videoId: meditation['videoId']!,
+                  title: meditation['title']!,
+                  gradientColors: meditation['gradient']!,
                 ),
-              );
-            },
-            child: GlassCard(
-              color: Colors.transparent,
-              hasShadow: true,
-              borderRadius: 25,
+                transitionsBuilder: (_, animation, __, child) {
+                  return FadeTransition(
+                    opacity: CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeInOutCubic,
+                    ),
+                    child: child,
+                  );
+                },
+              ),
+            );
+          },
+          child: Container(
+            // ADD THIS: Fixed height that matches grid cell
+            height: 180, // Reduced from previous values
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 20,
+                  spreadRadius: 5,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(25),
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -351,7 +363,6 @@ class _MeditationScreenState extends State<MeditationScreen>
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(25),
                 ),
                 child: Stack(
                   children: [
@@ -370,23 +381,35 @@ class _MeditationScreenState extends State<MeditationScreen>
                       ),
                     ),
 
-                    // 内容
+                    // 内容 - COMPACT VERSION
                     Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(16), // Reduced from 20
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 表情符号
-                          Text(
-                            meditation['emoji']!,
-                            style: const TextStyle(fontSize: 32),
+                          // 表情符号 - smaller
+                          Container(
+                            height: 40, // Reduced from 48
+                            width: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Center(
+                              child: Text(
+                                meditation['emoji']!,
+                                style: const TextStyle(fontSize: 28), // Reduced
+                              ),
+                            ),
                           ),
-                          const Spacer(),
-                          // 标题
+                          
+                          const SizedBox(height: 12),
+                          
+                          // 标题 - smaller
                           Text(
                             meditation['title']!,
                             style: const TextStyle(
-                              fontSize: 18,
+                              fontSize: 16, // Reduced from 18
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
                               shadows: [
@@ -398,21 +421,25 @@ class _MeditationScreenState extends State<MeditationScreen>
                               ],
                             ),
                           ),
+                          
                           const SizedBox(height: 4),
+                          
                           // 描述
                           Text(
                             meditation['desc']!,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11, // Reduced from 12
                               color: Colors.white.withAlpha(191),
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
+                          
                           const Spacer(),
+                          
                           // 底部装饰
                           Container(
-                            height: 2,
+                            height: 1, // Reduced from 2
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
@@ -422,20 +449,22 @@ class _MeditationScreenState extends State<MeditationScreen>
                               ),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          
+                          const SizedBox(height: 6), // Reduced from 8
+                          
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Icon(
                                 Icons.play_circle_fill,
                                 color: Colors.white.withAlpha(223),
-                                size: 20,
+                                size: 18, // Reduced from 20
                               ),
                               Text(
                                 'Begin',
                                 style: TextStyle(
                                   color: Colors.white.withAlpha(223),
-                                  fontSize: 12,
+                                  fontSize: 11, // Reduced from 12
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -449,10 +478,11 @@ class _MeditationScreenState extends State<MeditationScreen>
               ),
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildDreamyStarfield() {
     return AnimatedBuilder(
