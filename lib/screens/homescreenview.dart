@@ -24,40 +24,53 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late HomeScreenController _controller;
+  HomeScreenController? _controller;
   int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _controller = HomeScreenController(context);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _controller = HomeScreenController(context);
-      _controller.initState();
-      // Force rebuild after controller initialization
-      setState(() {});
+      if (mounted && _controller != null) {
+        _controller!.initState();
+        setState(() {});
+      }
     });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   void _refreshData() {
-    _controller.refreshAllData().then((_) {
+    _controller?.refreshAllData().then((_) {
       if (mounted) setState(() {});
     });
   }
 
-  // Add a method to rebuild the view when controller data changes
-  void _forceRebuild() {
-    if (mounted) setState(() {});
+  // 辅助方法：安全地访问 controller
+  HomeScreenController get controller {
+    if (_controller == null) {
+      // 如果 controller 为空，创建一个新的
+      _controller = HomeScreenController(context);
+      _controller!.initState();
+    }
+    return _controller!;
   }
 
   // ==================== 惊艳组件开始 ====================
 
   Widget homeContent() {
+    // 添加空检查
+    if (_controller == null) {
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.accentBlue),
+      );
+    }
+
     final authProvider = Provider.of<AuthProvider>(context);
     final nickname = authProvider.user.nickname;
 
@@ -146,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        '${_controller.weekLogs.length}',
+                        '${controller.weekLogs.length}',
                         style: const TextStyle(
                           fontSize: 36,
                           fontWeight: FontWeight.w800,
@@ -183,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMinimalChart() {
-    final spots = _controller.getLineChartData();
+    final spots = controller.getLineChartData();
 
     return LineChart(
       LineChartData(
@@ -225,15 +238,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildChartStats() {
-    if (_controller.weekLogs.isEmpty) {
+    if (controller.weekLogs.isEmpty) {
       return Text('No data yet', style: AppTextStyles.caption);
     }
 
     final avgIntensity =
-        _controller.weekLogs
+        controller.weekLogs
             .map((log) => log.intensity)
             .reduce((a, b) => a + b) /
-        _controller.weekLogs.length;
+        controller.weekLogs.length;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -246,7 +259,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         _buildStatItem(
           label: 'High',
-          value: _controller.weekLogs
+          value: controller.weekLogs
               .map((log) => log.intensity)
               .reduce((a, b) => a > b ? a : b)
               .toString(),
@@ -255,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         _buildStatItem(
           label: 'Consistency',
-          value: '${_controller.calculateConsistency()}%',
+          value: '${controller.calculateConsistency()}%',
           unit: '',
           color: AppColors.lightBlue,
         ),
@@ -301,7 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDailyTasksSection() {
-    final completedTasks = _controller.getCompletedTasks();
+    final completedTasks = controller.getCompletedTasks();
     final totalTasks = 3;
     final progress = completedTasks / totalTasks;
 
@@ -404,19 +417,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       _buildTaskItemCompact(
                         title: 'Emotion Log',
-                        completed: _controller.emotionLogged,
+                        completed: controller.emotionLogged,
                         icon: Icons.mood,
                       ),
                       const SizedBox(height: 12),
                       _buildTaskItemCompact(
                         title: 'Daily Check-In',
-                        completed: _controller.checkInCompleted,
+                        completed: controller.checkInCompleted,
                         icon: Icons.edit_note,
                       ),
                       const SizedBox(height: 12),
                       _buildTaskItemCompact(
                         title: 'Breathing',
-                        completed: _controller.breathingExerciseCompleted,
+                        completed: controller.breathingExerciseCompleted,
                         icon: Icons.air,
                       ),
                     ],
@@ -504,7 +517,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTodayEntriesSection() {
-    final todayLogs = _controller.getTodayLogs();
+    final todayLogs = controller.getTodayLogs();
 
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 20),
@@ -589,7 +602,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildModernLogEntry(EmotionLog log) {
-    final color = _controller.getEmotionColor(log.emotion);
+    final color = controller.getEmotionColor(log.emotion);
 
     return GlassCard(
       padding: const EdgeInsets.all(16),
@@ -609,7 +622,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Center(
               child: Icon(
-                _controller.getEmotionIcon(log.emotion),
+                controller.getEmotionIcon(log.emotion),
                 color: color,
                 size: 28,
               ),
@@ -627,7 +640,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      _controller.getEnergyLabel(log.emotion),
+                      controller.getEnergyLabel(log.emotion),
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -725,8 +738,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               );
 
-              if (confirm == true) {
-                _controller.deleteLog(log.id).then((_) => _refreshData());
+              if (confirm == true && mounted) {
+                _controller?.deleteLog(log.id).then((_) => _refreshData());
               }
             },
           ),
@@ -867,7 +880,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildQuickEmotionSelector() {
-    final todayLogs = _controller.getTodayLogs();
+    final todayLogs = controller.getTodayLogs();
     final currentEnergy = todayLogs.isNotEmpty ? todayLogs.last.emotion : null;
 
     return Column(
@@ -924,15 +937,17 @@ class _HomeScreenState extends State<HomeScreen> {
     required String label,
     required bool isSelected,
   }) {
-    final color = _controller.getEmotionColor(emotion);
-    final icon = _controller.getEmotionIcon(emotion);
+    final color = controller.getEmotionColor(emotion);
+    final icon = controller.getEmotionIcon(emotion);
 
     return GestureDetector(
       onTap: () async {
+        if (!mounted) return;
+
         // 快速记录情绪
         final log = EmotionLog(
           emotion: emotion,
-          intensity: _controller.getIntensityForEmotion(emotion),
+          intensity: controller.getIntensityForEmotion(emotion),
           note: '',
           dateTime: DateTime.now(),
         );
@@ -941,11 +956,13 @@ class _HomeScreenState extends State<HomeScreen> {
         final userId = authProvider.user.id;
 
         try {
-          await _controller.firebaseService.addEmotionLog(userId, log);
+          await _controller?.firebaseService.addEmotionLog(userId, log);
           _refreshData();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Logged: $label'), backgroundColor: color),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Logged: $label'), backgroundColor: color),
+            );
+          }
         } catch (e) {
           debugPrint('Error logging emotion: $e');
         }
