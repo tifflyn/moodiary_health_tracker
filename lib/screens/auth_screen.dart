@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
+import '../providers/auth_provider.dart' as my_provider; // 添加别名
+
+import 'homescreenview.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../providers/auth_provider.dart' as my_provider;
 import '../constants/colors.dart';
 import '../constants/text_styles.dart';
 import '../widgets/glass_card.dart';
-
-import 'homescreenview.dart';
 
 class AuthScreen extends StatefulWidget {
   final bool initialIsLogin;
