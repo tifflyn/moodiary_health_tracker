@@ -1,59 +1,104 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // 添加这行
+import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../models/emotionlog.dart';
 import '../services/ai_service.dart';
-import '../services/firebase_service.dart'; // 修改这行
+import '../services/firebase_service.dart';
+import '../providers/auth_provider.dart';
+import '../constants/colors.dart';
+import '../constants/text_styles.dart';
+import '../widgets/glass_card.dart';
 
 class AIChatbotScreen extends StatefulWidget {
   const AIChatbotScreen({super.key});
+
   @override
   State<AIChatbotScreen> createState() => _AIChatbotScreenState();
 }
 
-class _AIChatbotScreenState extends State<AIChatbotScreen> {
+class _AIChatbotScreenState extends State<AIChatbotScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   List<ChatMessage> messages = [];
   bool isLoading = false;
-  final FirebaseService _firebaseService = FirebaseService.instance; // 添加这行
-  User? _currentUser; // 添加这行
-  StreamSubscription<List<ChatMessage>>? _chatSubscription; // 添加这行
+  bool _isInitializing = true;
+  StreamSubscription<List<ChatMessage>>? _chatSubscription;
+
+  // 流星动画相关
+  late AnimationController _meteorController;
+  late Animation<double> _meteorAnimation;
+  List<Meteor> meteors = [];
+  final Random _random = Random();
 
   @override
   void initState() {
     super.initState();
-    _currentUser = FirebaseAuth.instance.currentUser;
-    _loadChatHistory();
-
+    _initializeChat();
     AIService.instance.setChatbotMode();
+
+    // 初始化流星动画
+    _meteorController = AnimationController(
+      duration: const Duration(seconds: 60),
+      vsync: this,
+    )..repeat(reverse: false);
+
+    _meteorAnimation = CurvedAnimation(
+      parent: _meteorController,
+      curve: Curves.linear,
+    );
+
+    // 初始化几个流星
+    for (int i = 0; i < 3; i++) {
+      meteors.add(_createRandomMeteor());
+    }
   }
 
-  Future<void> _loadChatHistory() async {
-    if (_currentUser == null) return;
+  // 创建随机流星
+  Meteor _createRandomMeteor() {
+    return Meteor(
+      startX: _random.nextDouble(),
+      startY: _random.nextDouble() * 0.3,
+      speed: 0.5 + _random.nextDouble() * 1.0,
+      length: 40 + _random.nextDouble() * 80,
+      color: Colors.white.withAlpha(127 + _random.nextInt(128)),
+      startDelay: _random.nextDouble() * 20,
+    );
+  }
 
-    try {
-      _chatSubscription?.cancel();
-      _chatSubscription = _firebaseService
-          .getChatMessages(_currentUser!.uid, limit: 50)
-          .listen(
-            (chatMessages) {
-              if (mounted) {
-                setState(() {
-                  messages = chatMessages.reversed.toList(); // ✅ 添加 reversed
-                });
-                _scrollToBottom();
-              }
-            },
-            onError: (error) {
-              debugPrint('Error loading chat history: $error');
-            },
-          );
-    } catch (e) {
-      debugPrint('Error loading chat history: $e');
-    }
+  @override
+  void dispose() {
+    _chatSubscription?.cancel();
+    _messageController.dispose();
+    _scrollController.dispose();
+    _meteorController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeChat() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // 添加欢迎消息
+    setState(() {
+      messages.add(
+        ChatMessage(
+          message:
+              '''Hello! I'm your mental wellness companion. I'm here to listen, support, and help you navigate your feelings. 💭
+
+Feel free to share what's on your mind - your thoughts, feelings, or anything you'd like to talk about.
+
+How are you feeling today?''',
+          isUser: false,
+          timestamp: DateTime.now(),
+        ),
+      );
+      _isInitializing = false;
+    });
+
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -69,11 +114,18 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
   }
 
   Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
-    if (_currentUser == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please sign in first')));
+    if (_messageController.text.trim().isEmpty || isLoading) return;
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.user.id;
+
+    if (userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please sign in first', style: AppTextStyles.bodySmall),
+          backgroundColor: AppColors.drained,
+        ),
+      );
       return;
     }
 
@@ -91,114 +143,51 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
       isLoading = true;
     });
 
-    String aiResponse = '';
-    try {
-      // 保存用户消息到 Firebase
-      try {
-        await _firebaseService.addChatMessage(_currentUser!.uid, userMessage);
-      } catch (dbError) {
-        debugPrint(
-          'Warning: Could not save user message to Firebase: $dbError',
-        );
-      }
-      _scrollToBottom();
+    _scrollToBottom();
 
-      // Get recent emotions for context (non-critical if it fails)
-      List<EmotionLog>? recentEmotions;
+    try {
+      // 保存用户消息
+      try {
+        await FirebaseService.instance.addChatMessage(userId, userMessage);
+      } catch (dbError) {
+        debugPrint('Warning: Could not save user message: $dbError');
+      }
+
+      // 获取最近的情绪记录（用于上下文）
+      List<EmotionLog> recentEmotions = [];
       try {
         final end = DateTime.now();
         final start = end.subtract(const Duration(days: 7));
-        recentEmotions = await _firebaseService.getEmotionsForDateRange(
-          _currentUser!.uid,
+        recentEmotions = await FirebaseService.instance.getEmotionsForDateRange(
+          userId,
           start,
           end,
         );
       } catch (dbError) {
         debugPrint('Warning: Could not load recent emotions: $dbError');
-        recentEmotions = null;
       }
 
-      // Generate AI response (will automatically fallback to rule-based on error)
+      // 生成AI回复
+      String aiResponse;
       try {
         aiResponse = await AIService.instance.generateTherapistResponse(
           userMessage.message,
           recentEmotions,
         );
-
-        // Show API error warnings to help debug
-        final apiError = AIService.instance.lastApiError;
-        if (apiError != null && mounted) {
-          String errorMessage = 'Using enhanced local AI';
-          bool showError = false;
-
-          if (apiError.contains('API key') ||
-              apiError.contains('401') ||
-              apiError.contains('Unauthorized') ||
-              apiError.contains('403')) {
-            if (apiError.contains('Gemini')) {
-              errorMessage =
-                  'API key error: Check your Gemini API key in main.dart. Using local AI for now.';
-            } else {
-              errorMessage =
-                  'API key error: Check your API key in main.dart. Using local AI for now.';
-            }
-            showError = true;
-          } else if (apiError.contains('Network error')) {
-            errorMessage =
-                'Network error: Check your internet connection. Using local AI for now.';
-            showError = true;
-          } else if (apiError.contains('Rate limit') ||
-              apiError.contains('429')) {
-            errorMessage =
-                'Rate limit exceeded: Please wait a moment. Using local AI for now.';
-            showError = true;
-          } else if (apiError.contains('quota') ||
-              apiError.contains('exceeded') ||
-              apiError.contains('insufficient_quota')) {
-            if (apiError.contains('Gemini')) {
-              errorMessage =
-                  'Gemini quota exceeded: Check usage at aistudio.google.com/app/apikey. Using local AI for now.';
-            } else {
-              errorMessage =
-                  'OpenAI quota exceeded: Add credits at platform.openai.com/account/billing. Using local AI for now.';
-            }
-            showError = true;
-          } else if (apiError.contains('timeout')) {
-            if (apiError.contains('Gemini')) {
-              errorMessage =
-                  'Request timeout: Gemini API took too long. Using local AI for now.';
-            } else {
-              errorMessage =
-                  'Request timeout: API took too long. Using local AI for now.';
-            }
-            showError = true;
-          }
-
-          if (showError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(errorMessage),
-                backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 4),
-              ),
-            );
-          }
-        }
-      } catch (aiError) {
-        // If AI service fails completely, use a basic fallback
-        debugPrint('AI service error: $aiError');
+      } catch (e) {
+        debugPrint('AI service error: $e');
         aiResponse =
-            '''Thank you for sharing with me. I'm here to listen and support you.
+            '''Thank you for sharing with me. I'm here to listen and support you. 💫
 
 It takes courage to reach out. Whatever you're experiencing is valid.
 
 Would you like to talk more about what's on your mind?''';
       }
 
-      // Ensure we have a response
+      // 确保有回复
       if (aiResponse.isEmpty) {
         aiResponse =
-            '''Thank you for your message. I'm here to listen and support you.
+            '''Thank you for your message. I'm here to listen and support you. ✨
 
 How can I help you today?''';
       }
@@ -216,15 +205,15 @@ How can I help you today?''';
         isLoading = false;
       });
 
-      // Try to save AI message (non-critical if it fails)
+      // 尝试保存AI消息
       try {
-        await _firebaseService.addChatMessage(_currentUser!.uid, aiMessage);
+        await FirebaseService.instance.addChatMessage(userId, aiMessage);
       } catch (dbError) {
-        debugPrint('Warning: Could not save AI message to database: $dbError');
+        debugPrint('Warning: Could not save AI message: $dbError');
       }
+
       _scrollToBottom();
     } catch (e) {
-      // Handle any other errors that occur during message sending
       debugPrint('Error sending message: $e');
 
       if (!mounted) return;
@@ -233,288 +222,481 @@ How can I help you today?''';
         isLoading = false;
       });
 
-      // Show user-friendly error message
-      String errorMessage = 'Unable to send message. Please try again.';
-      final errorStr = e.toString().toLowerCase();
+      // 显示错误消息
+      final errorMessage = ChatMessage(
+        message:
+            '''I apologize, but I'm having trouble connecting right now. 🌧️
 
-      if (errorStr.contains('network error') ||
-          errorStr.contains('socketexception') ||
-          errorStr.contains('failed host lookup') ||
-          errorStr.contains('connection')) {
-        errorMessage = 'Network error: Please check your internet connection';
-      } else if (errorStr.contains('api key') ||
-          errorStr.contains('401') ||
-          errorStr.contains('403') ||
-          errorStr.contains('unauthorized') ||
-          errorStr.contains('invalid api key')) {
-        if (errorStr.contains('gemini')) {
-          errorMessage =
-              'API key error: Please check your Gemini API key in main.dart';
-        } else {
-          errorMessage =
-              'API key error: Please check your API key in main.dart';
-        }
-      } else if (errorStr.contains('rate limit') ||
-          errorStr.contains('429') ||
-          errorStr.contains('quota')) {
-        errorMessage =
-            'Rate limit exceeded: Please wait a moment and try again';
-      } else if (errorStr.contains('timeout')) {
-        errorMessage = 'Request timed out. Please try again.';
-      } else {
-        // For debugging - show full error in console but user-friendly message in UI
-        errorMessage =
-            'Unable to process message. The enhanced local AI will be used instead.';
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
+Please check your internet connection and try again. Remember, I'm always here for you.''',
+        isUser: false,
+        timestamp: DateTime.now(),
       );
+
+      setState(() {
+        messages.add(errorMessage);
+      });
+
+      _scrollToBottom();
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.purple,
-        title: const Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Icon(Icons.psychology, color: Colors.purple),
-            ),
-            SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('AI Companion', style: TextStyle(fontSize: 18)),
-                Text(
-                  'Always here to listen',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      body: Column(
-        children: [
-          // Chat messages
-          Expanded(
-            child: messages.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.chat_bubble_outline,
-                          size: 80,
-                          color: Colors.grey[300],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Start a conversation',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 32),
-                          child: Text(
-                            'Share what\'s on your mind. I\'m here to listen and support you.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey[500]),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      final message = messages[index];
-                      return _buildMessageBubble(message);
-                    },
-                  ),
-          ),
-
-          // Loading indicator
-          if (isLoading)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                children: [
-                  const SizedBox(width: 16),
-                  CircleAvatar(
-                    backgroundColor: Colors.grey[200],
-                    child: const Icon(Icons.psychology, color: Colors.purple),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.purple,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text('Thinking...'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // Input area
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withValues(alpha: 0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      maxLines: null,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        hintText: 'Share what\'s on your mind...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide.none,
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey[100],
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                      ),
-                      onSubmitted: (_) => _sendMessage(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Colors.purple,
-                    child: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.white),
-                      onPressed: _sendMessage,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildMessageBubble(ChatMessage message) {
     final isUser = message.isUser;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
       child: Row(
-        mainAxisAlignment: isUser
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!isUser) ...[
-            CircleAvatar(
-              backgroundColor: Colors.grey[200],
-              child: const Icon(
-                Icons.psychology,
-                color: Colors.purple,
-                size: 20,
+          if (!isUser)
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: AppColors.accentGradient,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.psychology_alt,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            )
+          else
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.cardDark,
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: Icon(Icons.person, color: Colors.white, size: 20),
               ),
             ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
+
+          const SizedBox(width: 12),
+
+          Expanded(
             child: Column(
-              crossAxisAlignment: isUser
-                  ? CrossAxisAlignment.end
-                  : CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isUser ? Colors.purple : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+                GlassCard(
+                  padding: const EdgeInsets.all(16),
+                  color: isUser
+                      ? AppColors.accentBlue.withAlpha(30)
+                      : AppColors.cardDark,
                   child: Text(
                     message.message,
-                    style: TextStyle(
-                      color: isUser ? Colors.white : Colors.black87,
-                      fontSize: 15,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: isUser ? Colors.white : AppColors.textGray,
+                      height: 1.5,
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   DateFormat('h:mm a').format(message.timestamp),
-                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  style: AppTextStyles.caption,
                 ),
               ],
             ),
           ),
-          if (isUser) ...[
-            const SizedBox(width: 8),
-            CircleAvatar(
-              backgroundColor: Colors.purple[100],
-              child: const Icon(Icons.person, color: Colors.purple, size: 20),
-            ),
-          ],
         ],
       ),
     );
   }
 
-  @override
-  void dispose() {
-    _chatSubscription?.cancel(); // 添加这行
-    _messageController.dispose();
-    _scrollController.dispose();
-    super.dispose();
+  Widget _buildTypingIndicator() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: AppColors.accentGradient),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(Icons.psychology_alt, color: Colors.white, size: 20),
+            ),
+          ),
+          const SizedBox(width: 12),
+          GlassCard(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildTypingDot(0),
+                const SizedBox(width: 6),
+                _buildTypingDot(1),
+                const SizedBox(width: 6),
+                _buildTypingDot(2),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
+
+  Widget _buildTypingDot(int index) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: AppColors.accentBlue.withAlpha(
+          (255 * (0.5 + (index * 0.2))).toInt(),
+        ),
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: AppColors.bgGradient,
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+          ),
+
+          _buildMeteorLayer(),
+
+          Column(
+            children: [
+              // 头部
+              GlassCard(
+                margin: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: AppColors.accentGradient,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.psychology_alt_outlined,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Mindful AI',
+                                style: AppTextStyles.headline3,
+                              ),
+                              Text(
+                                'Available 24/7 • Confidential',
+                                style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.lightBlue,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentBlue.withAlpha(25),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppColors.accentBlue.withAlpha(76),
+                            ),
+                          ),
+                          child: Text(
+                            'AI',
+                            style: TextStyle(
+                              color: AppColors.accentBlue,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'I\'m here to listen and support you. Share anything that\'s on your mind.',
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        color: AppColors.lightBlue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 聊天消息
+              Expanded(
+                child: _isInitializing
+                    ? Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.accentBlue,
+                        ),
+                      )
+                    : messages.isEmpty
+                    ? Center(
+                        child: GlassCard(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.psychology_outlined,
+                                size: 60,
+                                color: AppColors.textGray.withAlpha(127),
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                'Start a conversation',
+                                style: AppTextStyles.headline3,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Your AI companion is here to listen and support you.',
+                                style: AppTextStyles.bodySmall,
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 10,
+                        ),
+                        itemCount: messages.length + (isLoading ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index < messages.length) {
+                            return _buildMessageBubble(messages[index]);
+                          } else {
+                            return _buildTypingIndicator();
+                          }
+                        },
+                      ),
+              ),
+
+              // 输入区域 - 增加底部边距
+              Container(
+                margin: const EdgeInsets.fromLTRB(20, 10, 20, 100), // 改为100
+                child: GlassCard(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _messageController,
+                          style: AppTextStyles.input,
+                          maxLines: null,
+                          decoration: InputDecoration(
+                            hintText: 'Share what\'s on your mind...',
+                            hintStyle: AppTextStyles.bodyLarge.copyWith(
+                              color: AppColors.textGray.withAlpha(150),
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 0,
+                            ),
+                          ),
+                          onSubmitted: (_) => _sendMessage(),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: _sendMessage,
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: AppColors.accentGradient,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.send,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMeteorLayer() {
+    return AnimatedBuilder(
+      animation: _meteorAnimation,
+      builder: (context, child) {
+        return CustomPaint(
+          painter: MeteorPainter(
+            animationValue: _meteorAnimation.value,
+            meteors: meteors,
+          ),
+          child: Container(),
+        );
+      },
+    );
+  }
+}
+
+// ==================== 流星相关类放在这里 ====================
+
+// 流星数据类
+class Meteor {
+  final double startX; // 起始X位置（0-1）
+  final double startY; // 起始Y位置（0-1）
+  final double speed; // 速度
+  final double length; // 长度
+  final Color color; // 颜色
+  final double startDelay; // 起始延迟（秒）
+
+  Meteor({
+    required this.startX,
+    required this.startY,
+    required this.speed,
+    required this.length,
+    required this.color,
+    required this.startDelay,
+  });
+}
+
+// 流星绘画器
+class MeteorPainter extends CustomPainter {
+  final double animationValue;
+  final List<Meteor> meteors;
+
+  MeteorPainter({required this.animationValue, required this.meteors});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var meteor in meteors) {
+      // 计算流星当前位置
+      final effectiveTime = (animationValue * 60 + meteor.startDelay) % 60;
+      if (effectiveTime < 2.0) {
+        // 只显示2秒钟的流星
+        final progress = effectiveTime / 2.0;
+
+        // 计算起始位置
+        final startX = meteor.startX * size.width;
+        final startY = meteor.startY * size.height;
+
+        // 计算结束位置
+        final endX = startX + meteor.length * progress;
+        final endY = startY + meteor.length * progress * 0.5;
+
+        // 绘制流星
+        final paint = Paint()
+          ..color = meteor.color
+          ..strokeWidth = 1.5
+          ..strokeCap = StrokeCap.round;
+
+        canvas.drawLine(Offset(startX, startY), Offset(endX, endY), paint);
+
+        // 绘制流星尾迹（渐变效果）
+        final gradientPaint = Paint()
+          ..shader =
+              LinearGradient(
+                colors: [meteor.color, meteor.color.withAlpha(0)],
+                stops: const [0.0, 1.0],
+              ).createShader(
+                Rect.fromPoints(Offset(startX, startY), Offset(endX, endY)),
+              )
+          ..strokeWidth = 3
+          ..strokeCap = StrokeCap.round;
+
+        canvas.drawLine(
+          Offset(startX, startY),
+          Offset(endX, endY),
+          gradientPaint,
+        );
+
+        // 绘制流星头部（发光点）
+        final headPaint = Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.fill;
+
+        canvas.drawCircle(Offset(endX, endY), 2, headPaint);
+
+        final glowPaint = Paint()
+          ..color = meteor.color.withAlpha(63)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+
+        canvas.drawCircle(Offset(endX, endY), 6, glowPaint);
+      }
+    }
+
+    // 绘制一些微弱的星星
+    final random = Random(42);
+    for (int i = 0; i < 20; i++) {
+      final x = random.nextDouble() * size.width;
+      final y = random.nextDouble() * size.height * 0.8; // 只在顶部80%区域
+      final alpha = 50 + random.nextInt(100);
+      final radius = 0.3 + random.nextDouble() * 0.7;
+
+      final starPaint = Paint()
+        ..color = Colors.white.withAlpha(alpha)
+        ..style = PaintingStyle.fill;
+
+      canvas.drawCircle(Offset(x, y), radius, starPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

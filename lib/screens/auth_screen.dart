@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart' as my_provider; // 添加别名
-import 'homescreen.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../providers/auth_provider.dart' as my_provider;
+import '../constants/colors.dart';
+import '../constants/text_styles.dart';
+import '../widgets/glass_card.dart';
+
+import 'homescreenview.dart';
 
 class AuthScreen extends StatefulWidget {
   final bool initialIsLogin;
@@ -20,230 +25,119 @@ class _AuthScreenState extends State<AuthScreen> {
 
   late bool _isLogin;
   bool _isLoading = false;
-  bool _showForgotPasswordDialog = false; // 新增：控制对话框显示
+  bool _showForgotPasswordDialog = false;
 
   @override
   void initState() {
     super.initState();
     _isLogin = widget.initialIsLogin;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_isLogin ? 'Sign In' : 'Sign Up'),
-        backgroundColor: Colors.purple,
-        foregroundColor: Colors.white,
-      ),
-      body: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 40),
-                    const Icon(Icons.favorite, size: 80, color: Colors.purple),
-                    const SizedBox(height: 20),
-                    Text(
-                      _isLogin ? 'Welcome Back!' : 'Create Account',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      _isLogin
-                          ? 'Sign in to continue your wellness journey'
-                          : 'Join us to start your wellness journey',
-                      style: const TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 30),
-
-                    TextFormField(
-                      controller: _emailController,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your email';
-                        }
-                        if (!value.contains('@')) {
-                          return 'Please enter a valid email';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: _passwordController,
-                      decoration: const InputDecoration(
-                        labelText: 'Password',
-                        border: OutlineInputBorder(),
-                      ),
-                      obscureText: true,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your password';
-                        }
-                        if (value.length < 6) {
-                          return 'Password must be at least 6 characters';
-                        }
-                        return null;
-                      },
-                    ),
-
-                    // 忘记密码链接 (仅在登录页面显示)
-                    if (_isLogin) ...[
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _showForgotPasswordDialog = true;
-                            });
-                          },
-                          child: const Text(
-                            'Forgot Password?',
-                            style: TextStyle(color: Colors.purple),
-                          ),
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 24),
-
-                    if (_isLoading)
-                      const CircularProgressIndicator()
-                    else
-                      ElevatedButton(
-                        onPressed: _submitForm,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(double.infinity, 50),
-                        ),
-                        child: Text(_isLogin ? 'Sign In' : 'Sign Up'),
-                      ),
-
-                    const SizedBox(height: 16),
-
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _isLogin = !_isLogin;
-                        });
-                      },
-                      child: Text(
-                        _isLogin
-                            ? 'Need an account? Sign up'
-                            : 'Have an account? Sign in',
-                        style: const TextStyle(color: Colors.purple),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // 忘记密码对话框
-          if (_showForgotPasswordDialog) _buildForgotPasswordDialog(),
-        ],
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
       ),
     );
   }
 
-  // 忘记密码对话框
+  Widget _buildDecoratedInputField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool obscureText = false,
+    String? Function(String?)? validator,
+  }) {
+    return GlassCard(
+      padding: const EdgeInsets.all(0),
+      color: AppColors.cardDark,
+      child: TextFormField(
+        controller: controller,
+        obscureText: obscureText,
+        style: AppTextStyles.input,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: AppTextStyles.bodyLarge.copyWith(
+            color: AppColors.textGray.withAlpha(180),
+          ),
+          prefixIcon: Icon(icon, color: AppColors.lightBlue, size: 22),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 16,
+            horizontal: 20,
+          ),
+        ),
+        validator: validator,
+      ),
+    );
+  }
+
   Widget _buildForgotPasswordDialog() {
     final resetEmailController = TextEditingController();
     bool isResetting = false;
 
     return Container(
-      color: Colors.black.withValues(alpha:0.5),
-      child: Center(
-        child: Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+      color: Colors.black.withAlpha(127),
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: GlassCard(
+          padding: const EdgeInsets.all(24),
           child: StatefulBuilder(
             builder: (context, setState) {
-              return Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 图标
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.purple.shade100,
-                        shape: BoxShape.circle,
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 70,
+                    height: 70,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: AppColors.accentGradient,
                       ),
-                      child: const Icon(
-                        Icons.lock_reset,
-                        size: 40,
-                        color: Colors.purple,
-                      ),
+                      shape: BoxShape.circle,
                     ),
-
-                    const SizedBox(height: 20),
-
-                    // 标题
-                    const Text(
-                      'Reset Password',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.purple,
-                      ),
+                    child: const Icon(
+                      Icons.lock_reset_outlined,
+                      color: Colors.white,
+                      size: 32,
                     ),
-
-                    const SizedBox(height: 12),
-
-                    // 说明文字
-                    const Text(
-                      'Enter your email address and we\'ll send you a link to reset your password.',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                      textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  Text('Reset Password', style: AppTextStyles.headline3),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Enter your email to receive a password reset link',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.lightBlue,
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // 邮箱输入框
-                    TextFormField(
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  GlassCard(
+                    padding: const EdgeInsets.all(0),
+                    color: AppColors.cardDark,
+                    child: TextFormField(
                       controller: resetEmailController,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.email),
+                      style: AppTextStyles.input,
+                      decoration: InputDecoration(
+                        hintText: 'your@email.com',
+                        hintStyle: AppTextStyles.bodyLarge.copyWith(
+                          color: AppColors.textGray.withAlpha(100),
+                        ),
+                        prefixIcon: Icon(
+                          Icons.email_outlined,
+                          color: AppColors.lightBlue,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.all(16),
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your email';
-                        }
-                        if (!value.contains('@')) {
-                          return 'Please enter a valid email';
-                        }
-                        return null;
-                      },
                     ),
-
-                    const SizedBox(height: 32),
-
-                    // 按钮
-                    Row(
-                      children: [
-                        // 取消按钮
-                        Expanded(
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GlassCard(
+                          padding: const EdgeInsets.all(0),
                           child: OutlinedButton(
                             onPressed: isResetting
                                 ? null
@@ -253,21 +147,26 @@ class _AuthScreenState extends State<AuthScreen> {
                                     });
                                   },
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.purple,
-                              side: const BorderSide(color: Colors.purple),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              foregroundColor: AppColors.accentBlue,
+                              side: BorderSide(
+                                color: AppColors.accentBlue.withAlpha(76),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(16),
                               ),
                             ),
-                            child: const Text('Cancel'),
+                            child: Text(
+                              'Cancel',
+                              style: AppTextStyles.buttonSmall,
+                            ),
                           ),
                         ),
-
-                        const SizedBox(width: 16),
-
-                        // 发送按钮
-                        Expanded(
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GlassCard(
+                          padding: const EdgeInsets.all(0),
                           child: ElevatedButton(
                             onPressed: isResetting
                                 ? null
@@ -276,100 +175,93 @@ class _AuthScreenState extends State<AuthScreen> {
                                         !resetEmailController.text.contains(
                                           '@',
                                         )) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Please enter a valid email',
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Please enter a valid email',
+                                              style: AppTextStyles.bodySmall,
+                                            ),
+                                            backgroundColor: AppColors.drained,
+                                            behavior: SnackBarBehavior.floating,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
                                           ),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
+                                        );
+                                      }
                                       return;
                                     }
-
-                                    setState(() {
-                                      isResetting = true;
-                                    });
-
+                                    setState(() => isResetting = true);
                                     try {
                                       final authProviderInstance =
                                           Provider.of<my_provider.AuthProvider>(
                                             context,
                                             listen: false,
                                           );
-
                                       await authProviderInstance
                                           .sendPasswordResetEmail(
                                             resetEmailController.text,
                                           );
-
-                                      if (!mounted) return;
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Password reset email sent! Check your inbox.',
-                                          ),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-
-                                      setState(() {
-                                        _showForgotPasswordDialog = false;
-                                      });
-                                    } on FirebaseAuthException catch (e) {
-                                      String errorMessage;
-                                      switch (e.code) {
-                                        case 'user-not-found':
-                                          errorMessage =
-                                              'No account found with this email';
-                                          break;
-                                        case 'invalid-email':
-                                          errorMessage =
-                                              'Invalid email address';
-                                          break;
-                                        default:
-                                          errorMessage =
-                                              'Failed to send reset email: ${e.message}';
-                                      }
-
                                       if (!mounted) return;
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(
                                         SnackBar(
-                                          content: Text(errorMessage),
-                                          backgroundColor: Colors.red,
+                                          content: Text(
+                                            'Reset email sent! Check your inbox.',
+                                            style: AppTextStyles.bodySmall,
+                                          ),
+                                          backgroundColor: AppColors.success,
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
                                         ),
                                       );
+                                      if (mounted) {
+                                        setState(() {
+                                          _showForgotPasswordDialog = false;
+                                        });
+                                      }
                                     } catch (e) {
                                       if (!mounted) return;
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(
                                         SnackBar(
-                                          content: Text('Error: $e'),
-                                          backgroundColor: Colors.red,
+                                          content: Text(
+                                            'Error: $e',
+                                            style: AppTextStyles.bodySmall,
+                                          ),
+                                          backgroundColor: AppColors.drained,
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
                                         ),
                                       );
                                     } finally {
                                       if (mounted) {
-                                        setState(() {
-                                          isResetting = false;
-                                        });
+                                        setState(() => isResetting = false);
                                       }
                                     }
                                   },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.purple,
+                              backgroundColor: AppColors.accentBlue,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(16),
                               ),
+                              elevation: 0,
                             ),
                             child: isResetting
                                 ? const SizedBox(
@@ -380,18 +272,16 @@ class _AuthScreenState extends State<AuthScreen> {
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Text(
-                                    'Send Reset Link',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                : Text(
+                                    'Send Link',
+                                    style: AppTextStyles.buttonSmall,
                                   ),
                           ),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               );
             },
           ),
@@ -402,45 +292,31 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       final authProvider = Provider.of<my_provider.AuthProvider>(
         context,
         listen: false,
-      ); // 使用别名
-
+      );
       if (_isLogin) {
         await authProvider.signInWithEmail(
           email: _emailController.text,
           password: _passwordController.text,
         );
-
-        if (authProvider.isLoggedIn) {
-          if (!mounted) return;
+        if (authProvider.isLoggedIn && mounted) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const HomeScreen()),
           );
-          return;
         }
       } else {
-        // 使用新的方法来检查邮箱是否存在
         try {
-          // 替代过时的 fetchSignInMethodsForEmail 方法
           final userCredential = await FirebaseAuth.instance
               .createUserWithEmailAndPassword(
                 email: _emailController.text,
                 password: _passwordController.text,
               );
-
-          // 如果创建成功，说明邮箱不存在，立即删除这个测试用户
           await userCredential.user?.delete();
-
-          // 现在真正注册用户
           await authProvider.signUpWithEmail(
             email: _emailController.text,
             password: _passwordController.text,
@@ -449,23 +325,21 @@ class _AuthScreenState extends State<AuthScreen> {
             gender: 'Prefer not to say',
             avatar: 'default',
           );
-
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Please check your email for verification link'),
             ),
           );
-
-          // 注册成功后自动切换到登录界面
-          setState(() {
-            _isLogin = true;
-            _emailController.clear();
-            _passwordController.clear();
-          });
+          if (mounted) {
+            setState(() {
+              _isLogin = true;
+              _emailController.clear();
+              _passwordController.clear();
+            });
+          }
         } on FirebaseAuthException catch (e) {
           if (e.code == 'email-already-in-use') {
-            // 邮箱已存在，切换到登录界面
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -476,10 +350,11 @@ class _AuthScreenState extends State<AuthScreen> {
                 duration: Duration(seconds: 3),
               ),
             );
-
-            setState(() {
-              _isLogin = true;
-            });
+            if (mounted) {
+              setState(() {
+                _isLogin = true;
+              });
+            }
             return;
           } else {
             rethrow;
@@ -488,43 +363,340 @@ class _AuthScreenState extends State<AuthScreen> {
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-
-      if (e.code == 'email-already-in-use') {
-        // 邮箱已存在，显示提示并切换到登录界面
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              e.message ?? 'This email is already registered. Please sign in.',
-            ),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-
-        // 自动切换到登录界面
-        setState(() {
-          _isLogin = true;
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.message}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+      String errorMessage;
+      switch (e.code) {
+        case 'user-not-found':
+          errorMessage = 'No account found with this email';
+          break;
+        case 'wrong-password':
+          errorMessage = 'Incorrect password';
+          break;
+        case 'email-already-in-use':
+          errorMessage = 'Email already in use. Please sign in.';
+          if (mounted) {
+            setState(() => _isLogin = true);
+          }
+          break;
+        case 'invalid-email':
+          errorMessage = 'Invalid email address';
+          break;
+        case 'weak-password':
+          errorMessage = 'Password is too weak';
+          break;
+        case 'too-many-requests':
+          errorMessage = 'Too many attempts. Please try again later';
+          break;
+        default:
+          errorMessage = e.message ?? 'Authentication failed';
       }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage, style: AppTextStyles.bodySmall),
+          backgroundColor: AppColors.drained,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Error: $e', style: AppTextStyles.bodySmall),
+          backgroundColor: AppColors.drained,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
       );
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: AppColors.bgGradient,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Stack(
+          children: [
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      GlassCard(
+                        margin: const EdgeInsets.only(bottom: 32),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 70,
+                                  height: 70,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: AppColors.accentGradient,
+                                    ),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.accentBlue.withAlpha(
+                                          76,
+                                        ),
+                                        blurRadius: 15,
+                                        spreadRadius: 3,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.psychology_alt_outlined,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _isLogin
+                                            ? 'Welcome Back'
+                                            : 'Join MindWell',
+                                        style: AppTextStyles.headline2,
+                                      ),
+                                      Text(
+                                        _isLogin
+                                            ? 'Continue your wellness journey'
+                                            : 'Start your wellness journey',
+                                        style: AppTextStyles.bodyLarge.copyWith(
+                                          color: AppColors.lightBlue,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            Container(
+                              height: 4,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppColors.accentBlue,
+                                    AppColors.accentBlue.withAlpha(100),
+                                    Colors.transparent,
+                                  ],
+                                  stops: const [0.5, 0.51, 1.0],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      GlassCard(
+                        margin: const EdgeInsets.only(bottom: 24),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Account Details',
+                              style: AppTextStyles.headline3.copyWith(
+                                color: AppColors.lightBlue,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            _buildDecoratedInputField(
+                              controller: _emailController,
+                              label: 'Email Address',
+                              icon: Icons.email_outlined,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your email';
+                                }
+                                if (!value.contains('@')) {
+                                  return 'Please enter a valid email';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            _buildDecoratedInputField(
+                              controller: _passwordController,
+                              label: 'Password',
+                              icon: Icons.lock_outline,
+                              obscureText: true,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your password';
+                                }
+                                if (value.length < 6) {
+                                  return 'Password must be at least 6 characters';
+                                }
+                                return null;
+                              },
+                            ),
+                            // 忘记密码链接 - 放在密码框下面，右侧对齐
+                            if (_isLogin) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                alignment: Alignment.centerRight,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(
+                                      () => _showForgotPasswordDialog = true,
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 4,
+                                      horizontal: 8,
+                                    ),
+                                    child: Text(
+                                      'Forgot Password?',
+                                      style: TextStyle(
+                                        color: AppColors.accentBlue,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        decoration: TextDecoration.underline,
+                                        decorationColor: AppColors.accentBlue
+                                            .withAlpha(127),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                          ],
+                        ),
+                      ),
+                      GlassCard(
+                        margin: const EdgeInsets.only(bottom: 24),
+                        padding: const EdgeInsets.all(0),
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _submitForm,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accentBlue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: _isLoading
+                              ? SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 3,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      _isLogin
+                                          ? Icons.login
+                                          : Icons.person_add_alt_1,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      _isLogin ? 'Sign In' : 'Sign Up',
+                                      style: AppTextStyles.button,
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                      GlassCard(
+                        padding: const EdgeInsets.all(0),
+                        child: TextButton(
+                          onPressed: () {
+                            setState(() => _isLogin = !_isLogin);
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                _isLogin
+                                    ? Icons.person_add_outlined
+                                    : Icons.login_outlined,
+                                color: AppColors.lightBlue,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                _isLogin
+                                    ? 'Need an account? Sign up'
+                                    : 'Have an account? Sign in',
+                                style: TextStyle(
+                                  color: AppColors.lightBlue,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      GlassCard(
+                        padding: const EdgeInsets.all(16),
+                        color: AppColors.cardDark.withAlpha(150),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.shield_outlined,
+                              color: AppColors.success,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Your data is encrypted and secure',
+                                style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.success,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (_showForgotPasswordDialog) _buildForgotPasswordDialog(),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
