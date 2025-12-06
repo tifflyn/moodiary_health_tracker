@@ -42,6 +42,17 @@ class _CheckInScreenState extends State<CheckInScreen> {
     );
   }
 
+  void _completeReset() {
+    // 使用 Navigator.pushReplacement 完全替换当前屏幕
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation1, animation2) => const CheckInScreen(),
+        transitionDuration: Duration.zero,
+      ),
+    );
+  }
+
   final List<Map<String, dynamic>> emojis = [
     {
       'emoji': '😊',
@@ -328,6 +339,13 @@ class _CheckInScreenState extends State<CheckInScreen> {
         generatedCheckIn = checkIn;
         isLoading = false;
       });
+
+      debugPrint('✅ CheckIn submitted successfully:');
+      debugPrint('   Emoji: ${checkIn.emoji}');
+      debugPrint('   Emotion: ${checkIn.emotion}');
+      debugPrint('   Title: ${checkIn.title}');
+      debugPrint('   Diary length: ${checkIn.diary?.length ?? 0}');
+      debugPrint('   AI Response length: ${checkIn.aiResponse?.length ?? 0}');
     } catch (e) {
       if (!mounted) return;
 
@@ -421,14 +439,15 @@ class _CheckInScreenState extends State<CheckInScreen> {
                             color: Colors.white.withAlpha(20),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 8,
                             ),
                             child: Text(
-                              'AI Response',
-                              style: TextStyle(
+                              generatedCheckIn?.title ??
+                                  'AI Response', // 使用实际标题
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -440,7 +459,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                   ),
                 ),
 
-                // 表情
+                // 表情 - 使用实际选择的emoji
                 Material(
                   color: Colors.transparent,
                   child: DecoratedBox(
@@ -448,15 +467,15 @@ class _CheckInScreenState extends State<CheckInScreen> {
                       color: Colors.white.withAlpha(20),
                       shape: BoxShape.circle,
                     ),
-                    child: const Padding(
-                      padding: EdgeInsets.all(32),
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
                       child: SizedBox(
                         width: 80,
                         height: 80,
                         child: Center(
                           child: Text(
-                            '😊', // 这里应该用 generatedCheckIn!.emoji
-                            style: TextStyle(fontSize: 80),
+                            generatedCheckIn?.emoji ?? '😊', // 使用实际emoji
+                            style: const TextStyle(fontSize: 60),
                           ),
                         ),
                       ),
@@ -464,9 +483,32 @@ class _CheckInScreenState extends State<CheckInScreen> {
                   ),
                 ),
 
+                const SizedBox(height: 16),
+
+                // 显示情绪标签
+                if (generatedCheckIn?.emotion != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(20),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Feeling: ${generatedCheckIn!.emotion}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+
                 const SizedBox(height: 32),
 
-                // AI 响应
+                // AI 响应 - 使用实际的AI回复
                 _buildGlassContainer(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -508,17 +550,89 @@ class _CheckInScreenState extends State<CheckInScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      Text(
-                        'Here is your AI response...', // 这里应该用 generatedCheckIn!.aiResponse
-                        style: TextStyle(
-                          fontSize: 16,
-                          height: 1.6,
-                          color: Colors.white.withAlpha(230),
+                      // 显示实际AI回复
+                      if (generatedCheckIn?.aiResponse != null)
+                        Text(
+                          generatedCheckIn!.aiResponse!,
+                          style: TextStyle(
+                            fontSize: 16,
+                            height: 1.6,
+                            color: Colors.white.withAlpha(230),
+                          ),
+                        )
+                      else
+                        const Text(
+                          'No AI response available.',
+                          style: TextStyle(
+                            fontSize: 16,
+                            height: 1.6,
+                            color: Colors.white,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // 显示用户的日记内容（如果有）
+                if (generatedCheckIn?.diary != null &&
+                    generatedCheckIn!.diary!.isNotEmpty)
+                  Column(
+                    children: [
+                      const SizedBox(height: 20),
+                      _buildGlassContainer(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Material(
+                                  color: Colors.transparent,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF2196F3),
+                                          Color(0xFF21CBF3),
+                                        ],
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const SizedBox(
+                                      width: 36,
+                                      height: 36,
+                                      child: Icon(
+                                        Icons.person,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Your Thoughts',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              generatedCheckIn!.diary!,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.5,
+                                color: Colors.white.withAlpha(200),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
 
                 const SizedBox(height: 32),
 
@@ -553,18 +667,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                   width: double.infinity,
                   height: 56,
                   child: OutlinedButton(
-                    onPressed: () {
-                      setState(() {
-                        generatedCheckIn = null;
-                        selectedEmoji = null;
-                        _selectedEmotion = null;
-                        _diaryController.clear();
-                        _titleController.clear();
-                        _selectedTags.clear();
-                        _currentPage = 0;
-                        _pageController.jumpToPage(0);
-                      });
-                    },
+                    onPressed: _completeReset,
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.white),
                       backgroundColor: Colors.transparent,

@@ -12,6 +12,133 @@ import '../constants/colors.dart';
 import '../constants/text_styles.dart';
 import '../widgets/glass_card.dart';
 
+class Meteor {
+  final double startX; // 起始X位置（0-1）
+  final double startY; // 起始Y位置（0-1）
+  final double speed; // 速度
+  final double length; // 长度
+  final Color color; // 颜色
+  final double startDelay; // 起始延迟（秒）
+
+  Meteor({
+    required this.startX,
+    required this.startY,
+    required this.speed,
+    required this.length,
+    required this.color,
+    required this.startDelay,
+  });
+}
+
+// 流星绘画器
+class MeteorPainter extends CustomPainter {
+  final double animationValue;
+  final List<Meteor> meteors;
+
+  MeteorPainter({required this.animationValue, required this.meteors});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 绘制一些微弱的星星（背景）
+    final random = Random(42);
+    for (int i = 0; i < 45; i++) {
+      // 增加星星数量
+      final x = random.nextDouble() * size.width;
+      final y = random.nextDouble() * size.height;
+      final alpha = 50 + random.nextInt(150); // 增加亮度变化范围
+      final radius = 0.5 + random.nextDouble() * 1.5; // 增加半径范围
+
+      final starPaint = Paint()
+        ..color = Colors.white.withAlpha(alpha)
+        ..style = PaintingStyle.fill;
+
+      canvas.drawCircle(Offset(x, y), radius, starPaint);
+
+      // 添加星星的微弱光晕
+      if (random.nextDouble() > 0.7) {
+        // 30%的星星有光晕
+        final glowPaint = Paint()
+          ..color = Colors.white.withAlpha(alpha ~/ 3)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+
+        canvas.drawCircle(Offset(x, y), radius * 2, glowPaint);
+      }
+    }
+
+    for (var meteor in meteors) {
+      // 计算流星当前位置
+      final effectiveTime = (animationValue * 60 + meteor.startDelay) % 60;
+
+      // 调整显示时间窗口
+      if (effectiveTime < 4.0) {
+        // 4秒显示时间
+        final progress = effectiveTime / 4.0;
+
+        // 计算起始位置 - 从左到右移动
+        final startX = meteor.startX * size.width;
+        final startY = meteor.startY * size.height;
+
+        // 计算结束位置
+        final distance = size.width * 0.8; // 移动屏幕宽度的80%
+        final endX = startX + distance * progress;
+        final endY = startY + distance * progress * 0.15; // 轻微向下倾斜
+
+        // 绘制流星尾迹（渐变效果）- 从左到右
+        final gradientPaint = Paint()
+          ..shader =
+              LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  meteor.color.withOpacity(0.9),
+                  meteor.color.withOpacity(0.0),
+                ],
+              ).createShader(
+                Rect.fromPoints(Offset(startX, startY), Offset(endX, endY)),
+              )
+          ..strokeWidth = 2.0
+          ..strokeCap = StrokeCap.round;
+
+        canvas.drawLine(
+          Offset(startX, startY),
+          Offset(endX, endY),
+          gradientPaint,
+        );
+
+        // 绘制流星头部（发光点）
+        final headPaint = Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.fill;
+
+        canvas.drawCircle(Offset(endX, endY), 3, headPaint);
+
+        // 绘制流星头部光晕
+        final glowPaint = Paint()
+          ..color = meteor.color.withOpacity(0.4)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+
+        canvas.drawCircle(Offset(endX, endY), 8, glowPaint);
+
+        // 添加流星尾迹的发光效果
+        final tailGlowPaint = Paint()
+          ..color = meteor.color.withOpacity(0.2)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3)
+          ..strokeWidth = 4.0
+          ..strokeCap = StrokeCap.round;
+
+        canvas.drawLine(
+          Offset(startX, startY),
+          Offset(endX, endY),
+          tailGlowPaint,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
 class AIChatbotScreen extends StatefulWidget {
   const AIChatbotScreen({super.key});
 
@@ -42,7 +169,7 @@ class _AIChatbotScreenState extends State<AIChatbotScreen>
 
     // 初始化流星动画
     _meteorController = AnimationController(
-      duration: const Duration(seconds: 60),
+      duration: const Duration(seconds: 10), // 增加动画时长
       vsync: this,
     )..repeat(reverse: false);
 
@@ -51,21 +178,40 @@ class _AIChatbotScreenState extends State<AIChatbotScreen>
       curve: Curves.linear,
     );
 
-    // 初始化几个流星
-    for (int i = 0; i < 3; i++) {
+    // 初始化更多流星
+    for (int i = 0; i < 10; i++) {
+      // 增加到5个流星
       meteors.add(_createRandomMeteor());
     }
   }
 
   // 创建随机流星
   Meteor _createRandomMeteor() {
+    // 随机决定流星的起始高度
+    // 0.0-0.3: 顶部区域 (30%)
+    // 0.3-0.7: 中间区域 (40%)
+    // 0.7-1.0: 底部区域 (30%)
+    final randomType = _random.nextDouble();
+    double startY;
+
+    if (randomType < 0.2) {
+      // 顶部流星：从上往下
+      startY = _random.nextDouble() * 0.2;
+    } else if (randomType < 0.5) {
+      // 中间流星：从屏幕中间开始
+      startY = 0.2 + _random.nextDouble() * 0.3;
+    } else {
+      // 底部流星：从底部开始
+      startY = 0.8 + _random.nextDouble() * 0.2;
+    }
+
     return Meteor(
-      startX: _random.nextDouble(),
-      startY: _random.nextDouble() * 0.3,
+      startX: _random.nextDouble() * 0.2, // 避免太靠近边缘
+      startY: startY, // 使用随机的高度
       speed: 0.5 + _random.nextDouble() * 1.0,
-      length: 40 + _random.nextDouble() * 80,
-      color: Colors.white.withAlpha(127 + _random.nextInt(128)),
-      startDelay: _random.nextDouble() * 20,
+      length: 50 + _random.nextDouble() * 100,
+      color: Colors.white.withAlpha(150 + _random.nextInt(105)),
+      startDelay: _random.nextDouble() * 40, // 0-20秒延迟
     );
   }
 
@@ -376,7 +522,7 @@ Please check your internet connection and try again. Remember, I'm always here f
             ),
           ),
 
-          _buildMeteorLayer(),
+          Positioned.fill(child: _buildMeteorLayer()),
 
           Column(
             children: [
@@ -580,123 +726,18 @@ Please check your internet connection and try again. Remember, I'm always here f
   }
 
   Widget _buildMeteorLayer() {
-    return AnimatedBuilder(
-      animation: _meteorAnimation,
-      builder: (context, child) {
-        return CustomPaint(
-          painter: MeteorPainter(
-            animationValue: _meteorAnimation.value,
-            meteors: meteors,
-          ),
-          child: Container(),
-        );
-      },
+    return SizedBox.expand(
+      child: AnimatedBuilder(
+        animation: _meteorAnimation,
+        builder: (context, child) {
+          return CustomPaint(
+            painter: MeteorPainter(
+              animationValue: _meteorAnimation.value,
+              meteors: meteors,
+            ),
+          );
+        },
+      ),
     );
   }
-}
-
-// ==================== 流星相关类放在这里 ====================
-
-// 流星数据类
-class Meteor {
-  final double startX; // 起始X位置（0-1）
-  final double startY; // 起始Y位置（0-1）
-  final double speed; // 速度
-  final double length; // 长度
-  final Color color; // 颜色
-  final double startDelay; // 起始延迟（秒）
-
-  Meteor({
-    required this.startX,
-    required this.startY,
-    required this.speed,
-    required this.length,
-    required this.color,
-    required this.startDelay,
-  });
-}
-
-// 流星绘画器
-class MeteorPainter extends CustomPainter {
-  final double animationValue;
-  final List<Meteor> meteors;
-
-  MeteorPainter({required this.animationValue, required this.meteors});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (var meteor in meteors) {
-      // 计算流星当前位置
-      final effectiveTime = (animationValue * 60 + meteor.startDelay) % 60;
-      if (effectiveTime < 2.0) {
-        // 只显示2秒钟的流星
-        final progress = effectiveTime / 2.0;
-
-        // 计算起始位置
-        final startX = meteor.startX * size.width;
-        final startY = meteor.startY * size.height;
-
-        // 计算结束位置
-        final endX = startX + meteor.length * progress;
-        final endY = startY + meteor.length * progress * 0.5;
-
-        // 绘制流星
-        final paint = Paint()
-          ..color = meteor.color
-          ..strokeWidth = 1.5
-          ..strokeCap = StrokeCap.round;
-
-        canvas.drawLine(Offset(startX, startY), Offset(endX, endY), paint);
-
-        // 绘制流星尾迹（渐变效果）
-        final gradientPaint = Paint()
-          ..shader =
-              LinearGradient(
-                colors: [meteor.color, meteor.color.withAlpha(0)],
-                stops: const [0.0, 1.0],
-              ).createShader(
-                Rect.fromPoints(Offset(startX, startY), Offset(endX, endY)),
-              )
-          ..strokeWidth = 3
-          ..strokeCap = StrokeCap.round;
-
-        canvas.drawLine(
-          Offset(startX, startY),
-          Offset(endX, endY),
-          gradientPaint,
-        );
-
-        // 绘制流星头部（发光点）
-        final headPaint = Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.fill;
-
-        canvas.drawCircle(Offset(endX, endY), 2, headPaint);
-
-        final glowPaint = Paint()
-          ..color = meteor.color.withAlpha(63)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
-
-        canvas.drawCircle(Offset(endX, endY), 6, glowPaint);
-      }
-    }
-
-    // 绘制一些微弱的星星
-    final random = Random(42);
-    for (int i = 0; i < 20; i++) {
-      final x = random.nextDouble() * size.width;
-      final y = random.nextDouble() * size.height * 0.8; // 只在顶部80%区域
-      final alpha = 50 + random.nextInt(100);
-      final radius = 0.3 + random.nextDouble() * 0.7;
-
-      final starPaint = Paint()
-        ..color = Colors.white.withAlpha(alpha)
-        ..style = PaintingStyle.fill;
-
-      canvas.drawCircle(Offset(x, y), radius, starPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

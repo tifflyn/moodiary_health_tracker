@@ -366,7 +366,7 @@ Please provide a supportive, empathetic response.''',
     try {
       // Gemini API endpoint
       final model =
-          'gemini-1.5-flash'; // or 'gemini-1.5-pro' for better quality
+          'gemini-2.5-flash'; // or 'gemini-1.5-pro' for better quality
       final url = Uri.parse(
         '$geminiApiBaseUrl/models/$model:generateContent?key=$_geminiApiKey',
       );
