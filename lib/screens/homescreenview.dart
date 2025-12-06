@@ -1194,7 +1194,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       floatingActionButton: _currentIndex == 0
           ? Container(
-              margin: const EdgeInsets.only(bottom: 80),
+              margin: const EdgeInsets.only(bottom: 0),
               child: FloatingActionButton.extended(
                 onPressed: () async {
                   await Navigator.push(
