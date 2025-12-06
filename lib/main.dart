@@ -4,7 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart'; // 添加这行
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/welcome_screen.dart';
-import 'screens/homescreen.dart';
+import 'screens/homescreenview.dart';
 import 'services/ai_service.dart';
 
 void main() async {
@@ -67,7 +67,7 @@ class MyApp extends StatelessWidget {
           }
 
           if (authProvider.isLoggedIn) {
-            return const HomeScreen();
+            return const HomeScreenView();
           } else {
             return const WelcomeScreen();
           }

@@ -1,4 +1,3 @@
-// lib/screens/daily_recommendation_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // 添加这行
 import '../../models/daily_recommendation.dart';
