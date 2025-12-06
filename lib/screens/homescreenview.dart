@@ -1,7 +1,9 @@
+// lib/screens/homescreenview.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'dart:math';
 import 'package:provider/provider.dart';
 import '../models/emotionlog.dart';
 import '../providers/auth_provider.dart';
@@ -23,14 +25,38 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   HomeScreenController? _controller;
   int _currentIndex = 0;
+  final Random _random = Random(42);
+
+  // 动画控制器 - 为星座和问候图标旋转
+  late AnimationController _animationController;
+  late Animation<double> _starsAnimation;
+  late Animation<double> _iconsAnimation;
 
   @override
   void initState() {
     super.initState();
     _controller = HomeScreenController(context);
+
+    // 初始化动画
+    _animationController = AnimationController(
+      duration: const Duration(seconds: 25),
+      vsync: this,
+    )..repeat(reverse: false);
+
+    _starsAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.linear,
+    );
+
+    _iconsAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: const Interval(0.0, 0.5, curve: Curves.easeInOut),
+    );
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _controller != null) {
         _controller!.initState();
@@ -41,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _animationController.dispose();
     _controller?.dispose();
     super.dispose();
   }
@@ -61,7 +88,122 @@ class _HomeScreenState extends State<HomeScreen> {
     return _controller!;
   }
 
-  // ==================== 惊艳组件开始 ====================
+  // ==================== 背景组件 ====================
+
+  // 静态星空背景 - 使用 DiaryScreen 的灰蓝色渐变
+  Widget _buildStaticStarfield() {
+    return CustomPaint(
+      painter: StaticStarFieldPainter(_random),
+      child: Container(),
+    );
+  }
+
+  // 北极星装饰（带轻微转动）
+  Widget _buildPolarisStar() {
+    return Positioned(
+      top: 150,
+      left: 50,
+      child: AnimatedBuilder(
+        animation: _starsAnimation,
+        builder: (context, child) {
+          return Transform.rotate(
+            angle: _starsAnimation.value * 2 * pi * 0.1, // 缓慢旋转
+            child: Transform.scale(
+              scale: 1 + sin(_starsAnimation.value * 2 * pi) * 0.05, // 轻微脉动
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withAlpha(200),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFF90CAF9).withAlpha(127),
+                      blurRadius: 40,
+                      spreadRadius: 10,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // 南十字星装饰（带轻微转动）
+  Widget _buildSouthernCross() {
+    return Positioned(
+      top: 300,
+      right: 60,
+      child: AnimatedBuilder(
+        animation: _starsAnimation,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(
+              sin(_starsAnimation.value * 2 * pi) * 2, // 轻微左右移动
+              cos(_starsAnimation.value * 2 * pi) * 1, // 轻微上下移动
+            ),
+            child: SizedBox(
+              width: 80,
+              height: 60,
+              child: CustomPaint(painter: SouthernCrossPainter()),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // 猎户座（Orion）装饰
+  Widget _buildOrion() {
+    return Positioned(
+      top: 100,
+      left: MediaQuery.of(context).size.width * 0.2,
+      child: AnimatedBuilder(
+        animation: _starsAnimation,
+        builder: (context, child) {
+          return Transform.rotate(
+            angle: _starsAnimation.value * 2 * pi * 0.05,
+            child: SizedBox(
+              width: 60,
+              height: 100,
+              child: CustomPaint(painter: OrionConstellationPainter()),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // 大熊座（Big Dipper/Ursa Major）装饰
+  Widget _buildUrsaMajor() {
+    return Positioned(
+      bottom: 200,
+      right: MediaQuery.of(context).size.width * 0.3,
+      child: AnimatedBuilder(
+        animation: _starsAnimation,
+        builder: (context, child) {
+          return Transform.rotate(
+            angle: _starsAnimation.value * 2 * pi * -0.03,
+            child: SizedBox(
+              width: 70,
+              height: 40,
+              child: CustomPaint(painter: UrsaMajorPainter()),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ==================== 主内容组件 ====================
 
   Widget homeContent() {
     // 添加空检查
@@ -74,20 +216,34 @@ class _HomeScreenState extends State<HomeScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
     final nickname = authProvider.user.nickname;
 
-    return NotificationListener<ScrollNotification>(
-      onNotification: (notification) => false,
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 100),
-        child: Column(
-          children: [
-            _buildHeroHeader(nickname),
-            _buildWeeklyChartSection(),
-            _buildDailyTasksSection(),
-            _buildTodayEntriesSection(),
-          ],
+    return Stack(
+      children: [
+        // 静态星空背景
+        _buildStaticStarfield(),
+
+        // 星座装饰
+        _buildPolarisStar(),
+        _buildSouthernCross(),
+        _buildOrion(),
+        _buildUrsaMajor(),
+
+        // 主内容
+        NotificationListener<ScrollNotification>(
+          onNotification: (notification) => false,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 100),
+            child: Column(
+              children: [
+                _buildHeroHeader(nickname),
+                _buildWeeklyChartSection(),
+                _buildDailyTasksSection(),
+                _buildTodayEntriesSection(),
+              ],
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -104,19 +260,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 "Weekly Overview",
                 style: AppTextStyles.headline2.copyWith(color: Colors.white),
               ),
-              Container(
+              GlassCard(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 6,
                 ),
-                decoration: BoxDecoration(
-                  color: AppColors.cardDark,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                borderRadius: 12,
+                color: Colors.black.withAlpha(63),
                 child: Text(
                   DateFormat('MMM d').format(DateTime.now()),
                   style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textGray,
+                    color: AppColors.lightBlue,
                   ),
                 ),
               ),
@@ -132,9 +286,10 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(
                 flex: 3,
                 child: GlassCard(
+                  color: Colors.black.withAlpha(63),
                   child: Column(
                     children: [
-                      SizedBox(height: 180, child: _buildMinimalChart()),
+                      SizedBox(height: 150, child: _buildMinimalChart()),
                       const SizedBox(height: 16),
                       _buildChartStats(),
                     ],
@@ -148,28 +303,32 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(
                 flex: 2,
                 child: GlassCard(
-                  color: AppColors.primaryBlue.withAlpha(76),
+                  color: Colors.black.withAlpha(63),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      const Icon(
-                        Icons.insights,
-                        size: 32,
-                        color: AppColors.accentBlue,
+                      AnimatedBuilder(
+                        animation: _starsAnimation,
+                        builder: (context, child) {
+                          return Transform.rotate(
+                            angle: _starsAnimation.value * 2 * pi * 0.2,
+                            child: Icon(
+                              Icons.star,
+                              size: 32,
+                              color: AppColors.accentBlue,
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
                       Text(
                         '${controller.weekLogs.length}',
-                        style: const TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
+                        style: AppTextStyles.numberLarge.copyWith(fontSize: 32),
                       ),
                       Text(
                         'logs this week',
                         style: AppTextStyles.caption.copyWith(
-                          color: AppColors.textGray,
+                          color: AppColors.lightBlue,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -178,8 +337,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: AppColors.accentGradient,
+                          gradient: LinearGradient(
+                            colors: [AppColors.accentBlue, AppColors.lightBlue],
                           ),
                           borderRadius: BorderRadius.circular(2),
                         ),
@@ -264,7 +423,7 @@ class _HomeScreenState extends State<HomeScreen> {
               .reduce((a, b) => a > b ? a : b)
               .toString(),
           unit: '/5',
-          color: AppColors.success,
+          color: const Color(0xFF4CAF50),
         ),
         _buildStatItem(
           label: 'Consistency',
@@ -338,7 +497,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: progress == 1
-                        ? [AppColors.success, const Color(0xFF4CAF50)]
+                        ? [const Color(0xFF4CAF50), const Color(0xFF2E7D32)]
                         : AppColors.accentGradient,
                   ),
                   borderRadius: BorderRadius.circular(20),
@@ -359,6 +518,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // 进度圆环和任务列表
           GlassCard(
+            color: Colors.black.withAlpha(63),
             child: Row(
               children: [
                 // 进度圆环
@@ -374,16 +534,21 @@ class _HomeScreenState extends State<HomeScreen> {
                         strokeWidth: 8,
                         color: AppColors.cardDark,
                       ),
-                      // 进度圆环
-                      CircularProgressIndicator(
-                        value: progress,
-                        strokeWidth: 8,
-                        strokeCap: StrokeCap.round,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          progress == 1
-                              ? AppColors.success
-                              : AppColors.accentBlue,
-                        ),
+                      // 进度圆环 - 发光电池效果
+                      AnimatedBuilder(
+                        animation: _starsAnimation,
+                        builder: (context, child) {
+                          return CircularProgressIndicator(
+                            value: progress,
+                            strokeWidth: 8,
+                            strokeCap: StrokeCap.round,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              progress == 1
+                                  ? const Color(0xFF4CAF50)
+                                  : AppColors.accentBlue,
+                            ),
+                          );
+                        },
                       ),
                       // 中间内容
                       Column(
@@ -433,14 +598,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           );
 
-                          // 如果返回 true，刷新数据
                           if (result == true) {
                             _refreshData();
-
-                            // 也通知 DiaryScreen（如果当前是 DiaryScreen）
-                            if (_currentIndex == 1) {
-                              // 这里可以发送一个事件通知 DiaryScreen 刷新
-                            }
                           }
                         },
                       ),
@@ -502,14 +661,14 @@ class _HomeScreenState extends State<HomeScreen> {
               height: 32,
               decoration: BoxDecoration(
                 color: completed
-                    ? AppColors.success.withAlpha(51)
+                    ? const Color(0xFF4CAF50).withAlpha(51)
                     : AppColors.cardLight,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 completed ? Icons.check : icon,
                 size: 16,
-                color: completed ? AppColors.success : AppColors.textGray,
+                color: completed ? const Color(0xFF4CAF50) : AppColors.textGray,
               ),
             ),
             const SizedBox(width: 12),
@@ -517,7 +676,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Text(
                 title,
                 style: TextStyle(
-                  color: completed ? AppColors.success : Colors.white,
+                  color: completed ? const Color(0xFF4CAF50) : Colors.white,
                   fontWeight: FontWeight.w500,
                   decoration: completed ? TextDecoration.lineThrough : null,
                 ),
@@ -526,7 +685,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Icon(
               completed ? Icons.check_circle : Icons.arrow_forward_ios,
               size: 16,
-              color: completed ? AppColors.success : AppColors.textGray,
+              color: completed ? const Color(0xFF4CAF50) : AppColors.textGray,
             ),
           ],
         ),
@@ -534,7 +693,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 新增：带自定义回调的任务项
   Widget _buildTaskItemCompactWithCallback({
     required String title,
     required bool completed,
@@ -557,14 +715,14 @@ class _HomeScreenState extends State<HomeScreen> {
               height: 32,
               decoration: BoxDecoration(
                 color: completed
-                    ? AppColors.success.withAlpha(51)
+                    ? const Color(0xFF4CAF50).withAlpha(51)
                     : AppColors.cardLight,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 completed ? Icons.check : icon,
                 size: 16,
-                color: completed ? AppColors.success : AppColors.textGray,
+                color: completed ? const Color(0xFF4CAF50) : AppColors.textGray,
               ),
             ),
             const SizedBox(width: 12),
@@ -572,7 +730,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Text(
                 title,
                 style: TextStyle(
-                  color: completed ? AppColors.success : Colors.white,
+                  color: completed ? const Color(0xFF4CAF50) : Colors.white,
                   fontWeight: FontWeight.w500,
                   decoration: completed ? TextDecoration.lineThrough : null,
                 ),
@@ -581,7 +739,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Icon(
               completed ? Icons.check_circle : Icons.arrow_forward_ios,
               size: 16,
-              color: completed ? AppColors.success : AppColors.textGray,
+              color: completed ? const Color(0xFF4CAF50) : AppColors.textGray,
             ),
           ],
         ),
@@ -632,6 +790,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           if (todayLogs.isEmpty)
             GlassCard(
+              color: Colors.black.withAlpha(63),
               child: Padding(
                 padding: const EdgeInsets.all(32),
                 child: Column(
@@ -679,6 +838,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return GlassCard(
       padding: const EdgeInsets.all(16),
+      color: Colors.black.withAlpha(63),
       child: Row(
         children: [
           // 情绪图标
@@ -866,7 +1026,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(greetingIcon, size: 18, color: AppColors.lightBlue),
+                      AnimatedBuilder(
+                        animation: _iconsAnimation,
+                        builder: (context, child) {
+                          return Transform.rotate(
+                            angle: _iconsAnimation.value * 2 * pi, // 旋转图标
+                            child: Icon(
+                              greetingIcon,
+                              size: 18,
+                              color: AppColors.lightBlue,
+                            ),
+                          );
+                        },
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         greeting,
@@ -945,7 +1117,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           const SizedBox(height: 24),
 
-          // 快速情绪选择
+          // 快速情绪选择 - 保留原来的情绪标签
           _buildQuickEmotionSelector(),
         ],
       ),
@@ -1149,7 +1321,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Check if controller is initialized
     if (_controller == null) {
       return Scaffold(
-        backgroundColor: AppColors.primaryDark,
+        backgroundColor: const Color(0xFF1A1A2E), // 使用 DiaryScreen 的背景色
         body: Center(
           child: CircularProgressIndicator(color: AppColors.accentBlue),
         ),
@@ -1157,7 +1329,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.primaryDark,
+      backgroundColor: const Color(0xFF1A1A2E), // 使用 DiaryScreen 的背景色
       extendBody: true,
       appBar: AppBar(
         elevation: 0,
@@ -1169,11 +1341,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         centerTitle: true,
       ),
-
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: AppColors.bgGradient,
+            colors: [
+              Color(0xFF1A1A2E), // 深蓝灰
+              Color(0xFF16213E), // 中蓝灰
+              Color(0xFF0F3460), // 深蓝
+            ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -1222,4 +1397,222 @@ class _HomeScreenState extends State<HomeScreen> {
           : null,
     );
   }
+}
+
+// 静态星空绘画器 - 使用 DiaryScreen 的灰蓝色调
+class StaticStarFieldPainter extends CustomPainter {
+  final Random random;
+
+  StaticStarFieldPainter(this.random);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 绘制灰蓝色渐变背景（模仿 DiaryScreen）
+    final bgPaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [
+          Color(0xFF1A1A2E), // 深蓝灰
+          Color(0xFF16213E), // 中蓝灰
+          Color(0xFF0F3460), // 深蓝
+        ],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
+
+    // 绘制微小的背景星星（数量减少，更分散）
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    for (int i = 0; i < 30; i++) {
+      // 进一步减少星星数量
+      final x = random.nextDouble() * size.width;
+      final y = random.nextDouble() * size.height;
+
+      final radius = 0.2 + random.nextDouble() * 0.4; // 更小的星星
+      final alpha = (30 + random.nextDouble() * 60).toInt(); // 更暗的星星
+
+      paint.color = Colors.white.withAlpha(alpha);
+      canvas.drawCircle(Offset(x, y), radius, paint);
+    }
+
+    // 绘制一些重要的导航星（更明亮）
+    final importantStars = [
+      Offset(size.width * 0.3, size.height * 0.2),
+      Offset(size.width * 0.7, size.height * 0.15),
+      Offset(size.width * 0.2, size.height * 0.4),
+      Offset(size.width * 0.8, size.height * 0.35),
+    ];
+
+    for (final star in importantStars) {
+      // 明亮的导航星
+      paint.color = Colors.white.withAlpha(120);
+      canvas.drawCircle(star, 0.8, paint);
+
+      // 微光晕效果
+      final glowPaint = Paint()
+        ..color = Colors.white.withAlpha(30)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+
+      canvas.drawCircle(star, 2, glowPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// 南十字星绘画器
+class SouthernCrossPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withAlpha(180)
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+
+    // 绘制南十字星的四个主要星星
+    final stars = [
+      Offset(centerX, centerY - 15), // 顶部
+      Offset(centerX, centerY + 15), // 底部
+      Offset(centerX - 12, centerY), // 左侧
+      Offset(centerX + 12, centerY), // 右侧
+    ];
+
+    // 绘制星星点
+    final starPaint = Paint()
+      ..color = Colors.white.withAlpha(200)
+      ..style = PaintingStyle.fill;
+
+    for (final star in stars) {
+      canvas.drawCircle(star, 1.8, starPaint);
+
+      // 星星微弱光晕
+      final glowPaint = Paint()
+        ..color = Colors.white.withAlpha(80)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
+
+      canvas.drawCircle(star, 3, glowPaint);
+    }
+
+    // 连接线条形成十字
+    canvas.drawLine(stars[0], stars[1], paint); // 垂直线
+    canvas.drawLine(stars[2], stars[3], paint); // 水平线
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// 猎户座绘画器
+class OrionConstellationPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withAlpha(150)
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final starPaint = Paint()
+      ..color = Colors.white.withAlpha(180)
+      ..style = PaintingStyle.fill;
+
+    // 猎户座的主要星星（简化版）
+    final beltStars = [
+      Offset(size.width * 0.3, size.height * 0.5), // 左腰带星
+      Offset(size.width * 0.5, size.height * 0.45), // 中腰带星
+      Offset(size.width * 0.7, size.height * 0.4), // 右腰带星
+    ];
+
+    final shoulderStars = [
+      Offset(size.width * 0.4, size.height * 0.2), // 左肩
+      Offset(size.width * 0.6, size.height * 0.15), // 右肩
+    ];
+
+    final footStars = [
+      Offset(size.width * 0.35, size.height * 0.8), // 左脚
+      Offset(size.width * 0.65, size.height * 0.75), // 右脚
+    ];
+
+    // 绘制所有星星
+    final allStars = [...beltStars, ...shoulderStars, ...footStars];
+    for (final star in allStars) {
+      canvas.drawCircle(star, 1.5, starPaint);
+
+      // 光晕效果
+      final glowPaint = Paint()
+        ..color = Colors.white.withAlpha(60)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+
+      canvas.drawCircle(star, 2.5, glowPaint);
+    }
+
+    // 连接腰带星星
+    for (int i = 0; i < beltStars.length - 1; i++) {
+      canvas.drawLine(beltStars[i], beltStars[i + 1], paint);
+    }
+
+    // 连接腰带到肩膀
+    canvas.drawLine(beltStars[0], shoulderStars[0], paint);
+    canvas.drawLine(beltStars[2], shoulderStars[1], paint);
+
+    // 连接腰带到脚部
+    canvas.drawLine(beltStars[0], footStars[0], paint);
+    canvas.drawLine(beltStars[2], footStars[1], paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// 大熊座（北斗七星）绘画器
+class UrsaMajorPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withAlpha(150)
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final starPaint = Paint()
+      ..color = Colors.white.withAlpha(180)
+      ..style = PaintingStyle.fill;
+
+    // 北斗七星的主要星星（简化版）
+    final stars = [
+      Offset(size.width * 0.1, size.height * 0.2), // 勺子起点
+      Offset(size.width * 0.3, size.height * 0.1), //
+      Offset(size.width * 0.5, size.height * 0.15), //
+      Offset(size.width * 0.6, size.height * 0.3), // 勺子底部
+      Offset(size.width * 0.8, size.height * 0.4), //
+      Offset(size.width * 0.7, size.height * 0.6), // 勺子柄
+      Offset(size.width * 0.5, size.height * 0.7), // 勺子柄末端
+    ];
+
+    // 绘制所有星星
+    for (final star in stars) {
+      canvas.drawCircle(star, 1.5, starPaint);
+
+      // 光晕效果
+      final glowPaint = Paint()
+        ..color = Colors.white.withAlpha(60)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+
+      canvas.drawCircle(star, 2.5, glowPaint);
+    }
+
+    // 连接星星形成北斗七星
+    for (int i = 0; i < stars.length - 1; i++) {
+      canvas.drawLine(stars[i], stars[i + 1], paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
