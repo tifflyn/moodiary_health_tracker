@@ -61,7 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return _controller!;
   }
 
-  // ==================== 惊艳组件开始 ====================
+  // ==================== better UI ====================
 
   Widget homeContent() {
     // 添加空检查

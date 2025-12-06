@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
-import '../providers/auth_provider.dart' as my_provider; // 添加别名
-
+import '../providers/auth_provider.dart' as my_provider;
 import 'homescreenview.dart';
+import 'email_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../constants/colors.dart';
 import '../constants/text_styles.dart';
@@ -298,39 +298,66 @@ class _AuthScreenState extends State<AuthScreen> {
         context,
         listen: false,
       );
+      
       if (_isLogin) {
+        // REGULAR LOGIN
         await authProvider.signInWithEmail(
           email: _emailController.text,
           password: _passwordController.text,
         );
-        if (authProvider.isLoggedIn && mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-          );
-        }
-      } else {
-        try {
-          final userCredential = await FirebaseAuth.instance
-              .createUserWithEmailAndPassword(
-                email: _emailController.text,
-                password: _passwordController.text,
-              );
-          await userCredential.user?.delete();
-          await authProvider.signUpWithEmail(
-            email: _emailController.text,
-            password: _passwordController.text,
-            nickname: 'User',
-            age: 0,
-            gender: 'Prefer not to say',
-            avatar: 'default',
-          );
-          if (!mounted) return;
+        
+        // Show success message
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please check your email for verification link'),
+            SnackBar(
+              content: const Text('Login successful!'),
+              backgroundColor: AppColors.success,
+              duration: const Duration(seconds: 2),
             ),
           );
+        }
+        
+        // Force state refresh to ensure navigation happens
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Navigation is handled by main.dart AuthWrapper
+        // No need for manual navigation
+        
+      } else {
+        // SIGN UP - Store credentials and go to verification
+        try {
+          // Store credentials for auto-login after verification
+          authProvider.storePendingCredentials(
+            _emailController.text,
+            _passwordController.text,
+          );
+          
+          // Use the simplified signup method
+          await authProvider.signUpWithEmailOnly(
+            email: _emailController.text,
+            password: _passwordController.text,
+          );
+          
+          if (!mounted) return;
+          
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Account created! Please verify your email.'),
+              backgroundColor: AppColors.success,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          
+          // Navigate to email verification screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const EmailScreen(),
+            ),
+          );
+          
+          // Clear form and switch to login mode
           if (mounted) {
             setState(() {
               _isLogin = true;
@@ -338,6 +365,7 @@ class _AuthScreenState extends State<AuthScreen> {
               _passwordController.clear();
             });
           }
+          
         } on FirebaseAuthException catch (e) {
           if (e.code == 'email-already-in-use') {
             if (!mounted) return;
@@ -385,6 +413,12 @@ class _AuthScreenState extends State<AuthScreen> {
           break;
         case 'too-many-requests':
           errorMessage = 'Too many attempts. Please try again later';
+          break;
+        case 'user-disabled':
+          errorMessage = 'This account has been disabled';
+          break;
+        case 'operation-not-allowed':
+          errorMessage = 'Email/password accounts are not enabled';
           break;
         default:
           errorMessage = e.message ?? 'Authentication failed';
@@ -552,7 +586,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                 return null;
                               },
                             ),
-                            // 忘记密码链接 - 放在密码框下面，右侧对齐
+                            // Forgot password link
                             if (_isLogin) ...[
                               const SizedBox(height: 12),
                               Container(
@@ -631,9 +665,13 @@ class _AuthScreenState extends State<AuthScreen> {
                       GlassCard(
                         padding: const EdgeInsets.all(0),
                         child: TextButton(
-                          onPressed: () {
-                            setState(() => _isLogin = !_isLogin);
-                          },
+                          onPressed: _isLoading
+                              ? null
+                              : () {
+                                  setState(() => _isLogin = !_isLogin);
+                                  _emailController.clear();
+                                  _passwordController.clear();
+                                },
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
