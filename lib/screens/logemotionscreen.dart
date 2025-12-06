@@ -1,8 +1,11 @@
-// lib/screens/logemotionscreen.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/emotionlog.dart';
-import '../services/firebase_service.dart'; // 修改这行
-import 'package:firebase_auth/firebase_auth.dart'; // 添加这行
+import '../services/firebase_service.dart';
+import '../providers/auth_provider.dart';
+import '../constants/colors.dart';
+import '../constants/text_styles.dart';
+import '../widgets/glass_card.dart';
 
 class LogEmotionScreen extends StatefulWidget {
   const LogEmotionScreen({super.key});
@@ -12,218 +15,376 @@ class LogEmotionScreen extends StatefulWidget {
 }
 
 class _LogEmotionScreenState extends State<LogEmotionScreen> {
-  String? selectedEnergy; // store the energy "name"
-  int intensity = 3; // default (will be set when user taps an energy)
+  String? selectedEnergy;
   final TextEditingController noteController = TextEditingController();
-  final FirebaseService _firebaseService = FirebaseService.instance; // 添加这行
-  User? _currentUser; // 添加这行
+  bool _isSaving = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _currentUser = FirebaseAuth.instance.currentUser; // 获取当前用户
-  }
-
-  final energies = [
-    {
-      'name': 'totally_drained',
-      'label': 'Totally drained.',
-      'icon': Icons.battery_0_bar,
-      'color': Colors.red,
-      'value': 1,
-    },
-    {
-      'name': 'running_low',
-      'label': 'Running low...',
-      'icon': Icons.battery_1_bar,
-      'color': Colors.orange,
-      'value': 2,
-    },
-    {
-      'name': 'medium_energy',
-      'label': 'Medium energy',
-      'icon': Icons.battery_2_bar,
-      'color': Colors.green,
-      'value': 3,
-    },
-    {
-      'name': 'energized',
-      'label': 'Energized!',
-      'icon': Icons.battery_3_bar,
-      'color': Colors.blue,
-      'value': 4,
-    },
-    {
-      'name': 'fully_charged',
-      'label': 'Fully charged!!!',
-      'icon': Icons.battery_full,
-      'color': Colors.purple,
-      'value': 5,
-    },
+  // 定义一个类型安全的能量级别数据结构
+  final List<EnergyLevel> energies = [
+    EnergyLevel(
+      name: 'totally_drained',
+      label: 'Totally drained.',
+      icon: Icons.battery_0_bar,
+      color: AppColors.drained,
+      value: 1,
+      gradient: [Colors.red, Colors.red.shade300],
+    ),
+    EnergyLevel(
+      name: 'running_low',
+      label: 'Running low...',
+      icon: Icons.battery_1_bar,
+      color: AppColors.low,
+      value: 2,
+      gradient: [Colors.orange, Colors.orange.shade300],
+    ),
+    EnergyLevel(
+      name: 'medium_energy',
+      label: 'Medium energy',
+      icon: Icons.battery_2_bar,
+      color: AppColors.medium,
+      value: 3,
+      gradient: [Colors.green, Colors.green.shade300],
+    ),
+    EnergyLevel(
+      name: 'energized',
+      label: 'Energized!',
+      icon: Icons.battery_3_bar,
+      color: AppColors.good,
+      value: 4,
+      gradient: [Colors.blue, Colors.blue.shade300],
+    ),
+    EnergyLevel(
+      name: 'fully_charged',
+      label: 'Fully charged!!!',
+      icon: Icons.battery_full,
+      color: AppColors.high,
+      value: 5,
+      gradient: [Colors.purple, Colors.purple.shade300],
+    ),
   ];
 
   Future<void> saveEmotion() async {
     if (selectedEnergy == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an energy level')),
+        SnackBar(
+          content: Text(
+            'Please select an energy level',
+            style: AppTextStyles.bodySmall,
+          ),
+          backgroundColor: AppColors.drained,
+        ),
       );
       return;
     }
 
-    if (_currentUser == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please sign in first')));
+    setState(() => _isSaving = true);
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.user.id;
+
+    if (userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please sign in first', style: AppTextStyles.bodySmall),
+          backgroundColor: AppColors.drained,
+        ),
+      );
+      setState(() => _isSaving = false);
       return;
     }
 
-    // intensity already set when selecting; ensure it's consistent
+    // 找到选中的能量级别
+    final selected = energies.firstWhere(
+      (energy) => energy.name == selectedEnergy,
+      orElse: () => energies[2], // 默认为中等能量
+    );
+
     final log = EmotionLog(
       emotion: selectedEnergy!,
-      intensity: intensity,
+      intensity: selected.value,
       note: noteController.text,
       dateTime: DateTime.now(),
     );
 
     try {
-      await _firebaseService.addEmotionLog(_currentUser!.uid, log); // 修改这行
+      await FirebaseService.instance.addEmotionLog(userId, log);
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Entry saved!')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Energy level logged successfully!',
+              style: AppTextStyles.bodySmall.copyWith(color: Colors.white),
+            ),
+            backgroundColor: selected.color,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+
+        // 添加轻微延迟，让用户看到成功消息
+        await Future.delayed(const Duration(milliseconds: 500));
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error saving: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving: $e', style: AppTextStyles.bodySmall),
+            backgroundColor: AppColors.drained,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
   }
 
-  void _onSelectEnergy(Map<String, Object?> energy) {
-    setState(() {
-      selectedEnergy = energy['name'] as String?;
-      intensity = (energy['value'] as int?) ?? 3;
-    });
+  Widget _buildEnergyGrid() {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 1.2,
+      ),
+      itemCount: energies.length,
+      itemBuilder: (context, index) {
+        final energy = energies[index];
+        final isSelected = selectedEnergy == energy.name;
+
+        return GestureDetector(
+          onTap: () => setState(() => selectedEnergy = energy.name),
+          child: GlassCard(
+            padding: const EdgeInsets.all(20),
+            color: isSelected ? energy.color.withAlpha(25) : null,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: energy.gradient,
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: energy.color.withAlpha(100),
+                              blurRadius: 15,
+                              spreadRadius: 3,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Icon(energy.icon, size: 32, color: Colors.white),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  energy.label,
+                  style: AppTextStyles.subtitle2.copyWith(
+                    color: isSelected ? energy.color : Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${energy.value}/5',
+                  style: AppTextStyles.caption.copyWith(
+                    color: isSelected ? energy.color : AppColors.textGray,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.purple,
-        title: const Text('Log Your Energy'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'What\'s your energy level right now?',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: energies.map((energy) {
-                final isSelected = selectedEnergy == energy['name'];
-                final color = energy['color'] as Color;
-                return GestureDetector(
-                  onTap: () => _onSelectEnergy(energy),
-                  child: Container(
-                    width: (MediaQuery.of(context).size.width - 56) / 3,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      color: isSelected ? color : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: color, width: 2),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: color.withValues(alpha: 0.25),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ]
-                          : [],
-                    ),
-                    child: Column(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: AppColors.bgGradient,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // 头部
+              GlassCard(
+                margin: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Icon(
-                          energy['icon'] as IconData,
-                          size: 40,
-                          color: isSelected ? Colors.white : color,
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.cardDark,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.arrow_back,
+                              color: AppColors.lightBlue,
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          energy['label'] as String,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.white : Colors.black87,
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentBlue.withAlpha(25),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'Log Emotion',
+                            style: AppTextStyles.buttonSmall.copyWith(
+                              color: AppColors.accentBlue,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                );
-              }).toList(),
-            ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'How are you feeling right now?',
+                      style: AppTextStyles.headline2,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Select your current energy level',
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        color: AppColors.lightBlue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-            // NOTE: intensity slider removed intentionally per request.
-            const SizedBox(height: 32),
-            const Text(
-              'Notes (Optional)',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: noteController,
-              maxLines: 5,
-              decoration: InputDecoration(
-                hintText: 'What triggered this feeling? Any thoughts...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.purple, width: 2),
+              // 能量级别选择
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _buildEnergyGrid(),
                 ),
               ),
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: saveEmotion,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+
+              // 笔记输入
+              GlassCard(
+                margin: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Add a note (optional)',
+                      style: AppTextStyles.subtitle1,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: noteController,
+                      maxLines: 4,
+                      style: AppTextStyles.input,
+                      decoration: InputDecoration(
+                        hintText:
+                            'What\'s on your mind? What triggered this feeling?',
+                        hintStyle: AppTextStyles.bodyLarge.copyWith(
+                          color: AppColors.textGray.withAlpha(150),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: AppColors.cardDark,
+                        contentPadding: const EdgeInsets.all(16),
+                      ),
+                    ),
+                  ],
                 ),
-                child: const Text(
-                  'Save Entry',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+              ),
+
+              // 保存按钮
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                child: GlassCard(
+                  padding: const EdgeInsets.all(0),
+                  child: ElevatedButton(
+                    onPressed: _isSaving || selectedEnergy == null
+                        ? null
+                        : saveEmotion,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: selectedEnergy != null
+                          ? _getSelectedColor()
+                          : AppColors.cardDark,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      elevation: 0,
+                      shadowColor: Colors.transparent,
+                    ),
+                    child: _isSaving
+                        ? SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.save, size: 20),
+                              const SizedBox(width: 12),
+                              Text('Save Entry', style: AppTextStyles.button),
+                            ],
+                          ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Color _getSelectedColor() {
+    if (selectedEnergy == null) return AppColors.cardDark;
+
+    final selected = energies.firstWhere(
+      (energy) => energy.name == selectedEnergy,
+      orElse: () => energies[2],
+    );
+
+    return selected.color;
   }
 
   @override
@@ -231,4 +392,23 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
     noteController.dispose();
     super.dispose();
   }
+}
+
+// 定义一个类型安全的 EnergyLevel 类
+class EnergyLevel {
+  final String name;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final int value;
+  final List<Color> gradient;
+
+  EnergyLevel({
+    required this.name,
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.value,
+    required this.gradient,
+  });
 }

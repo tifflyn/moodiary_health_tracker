@@ -8,7 +8,6 @@ import '../models/daily_recommendation.dart';
 import '../models/user_model.dart';
 import 'package:flutter/foundation.dart';
 
-
 class FirebaseService {
   static final FirebaseService instance = FirebaseService._init();
 
@@ -122,23 +121,26 @@ class FirebaseService {
   }
 
   // User profile management
+  // 修改 firebase_service.dart 中的 getUserProfile 方法
   Future<UserModel> getUserProfile(String userId) async {
     final doc = await _firestore.collection('users').doc(userId).get();
+
     if (doc.exists) {
       return UserModel.fromMap(doc.data()!);
     } else {
-      // Create default profile if doesn't exist
-      final defaultUser = UserModel(
+      // 🔴 修改这里：创建一个真正的空用户，而不是带默认值的
+      // 这样我们就可以通过检查昵称是否为空来判断是否设置过资料
+      final emptyUser = UserModel(
         id: userId,
         email: _auth.currentUser?.email ?? '',
-        nickname: 'User',
+        nickname: '', // 改为空字符串
         avatar: 'default',
-        age: 0,
+        age: -1, // 改为 -1 表示未设置
         gender: 'Prefer not to say',
         createdAt: DateTime.now(),
       );
-      await _firestore.collection('users').doc(userId).set(defaultUser.toMap());
-      return defaultUser;
+      await _firestore.collection('users').doc(userId).set(emptyUser.toMap());
+      return emptyUser;
     }
   }
 
@@ -186,50 +188,49 @@ class FirebaseService {
         );
   }
 
- Future<List<EmotionLog>> getEmotionsForDateRange(
-  String userId,
-  DateTime start,
-  DateTime end,
-) async {
-  try {
-    // 将 DateTime 转换为字符串格式以便查询
-    final startStr = start.toIso8601String();
-    final endStr = end.toIso8601String();
-    
-    final snapshot = await _firestore
+  Future<List<EmotionLog>> getEmotionsForDateRange(
+    String userId,
+    DateTime start,
+    DateTime end,
+  ) async {
+    try {
+      // 将 DateTime 转换为字符串格式以便查询
+      final startStr = start.toIso8601String();
+      final endStr = end.toIso8601String();
+
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('emotions')
+          .where('dateTime', isGreaterThanOrEqualTo: startStr)
+          .where('dateTime', isLessThanOrEqualTo: endStr)
+          .orderBy('dateTime')
+          .get();
+
+      return snapshot.docs.map((doc) {
+        return EmotionLog.fromFirestore(doc);
+      }).toList();
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error in getEmotionsForDateRange: $e');
+      }
+
+      return [];
+    }
+  }
+
+  Future<void> deleteEmotion(String userId, String emotionId) async {
+    if (emotionId.isEmpty) {
+      throw Exception('Emotion ID is empty');
+    }
+
+    await _firestore
         .collection('users')
         .doc(userId)
         .collection('emotions')
-        .where('dateTime', isGreaterThanOrEqualTo: startStr)
-        .where('dateTime', isLessThanOrEqualTo: endStr)
-        .orderBy('dateTime')
-        .get();
-
-    return snapshot.docs.map((doc) {
-      return EmotionLog.fromFirestore(doc);
-    }).toList();
-  } catch (e) {
-    if(kDebugMode)
-    {
-      print('❌ Error in getEmotionsForDateRange: $e');
-    }
-    
-    return [];
+        .doc(emotionId)
+        .delete();
   }
-}
-
-  Future<void> deleteEmotion(String userId, String emotionId) async {
-  if (emotionId.isEmpty) {
-    throw Exception('Emotion ID is empty');
-  }
-  
-  await _firestore
-      .collection('users')
-      .doc(userId)
-      .collection('emotions')
-      .doc(emotionId)
-      .delete();
-}
 
   // Check-ins
   Future<void> addCheckIn(String userId, CheckIn checkIn) async {
@@ -280,17 +281,33 @@ class FirebaseService {
 
   Future<List<CheckIn>> getRecentCheckIns(String userId, {int days = 7}) async {
     final since = DateTime.now().subtract(Duration(days: days));
-    final snapshot = await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('check_ins')
-        .where('timestamp', isGreaterThan: since)
-        .orderBy('timestamp', descending: true)
-        .get();
 
-    return snapshot.docs.map((doc) {
-      return CheckIn.fromFirestore(doc); // 使用 fromFirestore
-    }).toList();
+    try {
+      // 转换为字符串格式
+      final sinceStr = since.toIso8601String();
+
+      debugPrint('📅 查询最近 $days 天的记录'); // 添加这行
+      debugPrint('   时间范围: $sinceStr 至今'); // 添加这行
+
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('check_ins')
+          .where('timestamp', isGreaterThanOrEqualTo: sinceStr)
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      debugPrint('✅ 查询完成，找到 ${snapshot.docs.length} 条记录'); // 添加这行
+
+      return snapshot.docs.map((doc) {
+        return CheckIn.fromFirestore(doc);
+      }).toList();
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error getting recent check-ins: $e');
+      }
+      return [];
+    }
   }
 
   // 在 FirebaseService 中添加
@@ -314,11 +331,10 @@ class FirebaseService {
 
       return snapshot.docs.map((doc) => CheckIn.fromFirestore(doc)).toList();
     } catch (e) {
-      if (kDebugMode)
-      {
+      if (kDebugMode) {
         print('Error getting today check-ins: $e');
       }
-      
+
       return [];
     }
   }

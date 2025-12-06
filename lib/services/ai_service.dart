@@ -51,7 +51,7 @@ class AIService {
       // 🎯 使用新项目的 API 密钥
       final apiKey =
           dotenv.env['GEMINI_API_KEY'] ??
-          'AIzaSyDkdff1oUen4H_Z9zoh-TCdW4soDUwTL70'; // 你的新密钥
+          'AIzaSyDCD6kBoBUxVvq0sigKWF2IOmebvdDXYXQ'; // 你的新密钥
 
       _geminiModel = GenerativeModel(
         model: 'gemini-2.5-flash', // 使用新项目的模型

@@ -1,128 +1,192 @@
 import 'package:flutter/material.dart';
-import 'auth_screen.dart'; // 改为导入 AuthScreen
+import 'package:flutter/services.dart';
+import '../constants/colors.dart';
+import '../constants/text_styles.dart';
+import '../widgets/glass_card.dart';
+import 'auth_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // 设置状态栏颜色
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+    );
+
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            children: [
-              // 顶部留空
-              const Expanded(flex: 1, child: SizedBox()),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: AppColors.bgGradient,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              children: [
+                // 顶部留空
+                const Expanded(flex: 1, child: SizedBox()),
 
-              // 应用图标和标题
-              Column(
-                children: [
-                  const Icon(Icons.favorite, size: 100, color: Colors.purple),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Welcome to MindWell',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.purple,
+                // 应用图标和标题
+                Column(
+                  children: [
+                    GlassCard(
+                      padding: const EdgeInsets.all(30),
+                      child: Icon(
+                        Icons.psychology_alt_outlined,
+                        size: 80,
+                        color: AppColors.accentBlue,
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Your personal mental wellness companion',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-
-              // 中间留空
-              const Expanded(flex: 2, child: SizedBox()),
-
-              // 按钮区域
-              Column(
-                children: [
-                  // 注册按钮
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const AuthScreen(initialIsLogin: false),
+                    const SizedBox(height: 32),
+                    Text(
+                      'Welcome to MindWell',
+                      style: AppTextStyles.headline1.copyWith(
+                        fontSize: 36,
+                        shadows: [
+                          Shadow(
+                            color: AppColors.accentBlue.withAlpha(76),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
                           ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.purple,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
+                        ],
                       ),
-                      child: const Text(
-                        'Create Account',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      textAlign: TextAlign.center,
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Your personal mental wellness companion',
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        color: AppColors.lightBlue,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
 
-                  const SizedBox(height: 16),
+                // 中间留空
+                const Expanded(flex: 2, child: SizedBox()),
 
-                  // 登录按钮
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const AuthScreen(initialIsLogin: true),
+                // 按钮区域
+                Column(
+                  children: [
+                    // 注册按钮
+                    SizedBox(
+                      width: double.infinity,
+                      child: GlassCard(
+                        padding: const EdgeInsets.all(0),
+                        color: AppColors.accentBlue.withAlpha(30),
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const AuthScreen(initialIsLogin: false),
+                              ),
+                            );
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 20,
+                              horizontal: 32,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
                           ),
-                        );
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.purple,
-                        side: const BorderSide(color: Colors.purple, width: 2),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Sign In',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.person_add_alt_1,
+                                color: AppColors.accentBlue,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Create Account',
+                                style: AppTextStyles.button.copyWith(
+                                  color: AppColors.accentBlue,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 16),
 
-                  // 隐私条款提示
-                  Text(
-                    'By continuing, you agree to our Terms of Service and Privacy Policy',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+                    // 登录按钮
+                    SizedBox(
+                      width: double.infinity,
+                      child: GlassCard(
+                        padding: const EdgeInsets.all(0),
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const AuthScreen(initialIsLogin: true),
+                              ),
+                            );
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 20,
+                              horizontal: 32,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.login, color: AppColors.lightBlue),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Sign In',
+                                style: AppTextStyles.button.copyWith(
+                                  color: AppColors.lightBlue,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
 
-              // 底部留空
-              const Expanded(flex: 1, child: SizedBox()),
-            ],
+                    const SizedBox(height: 32),
+
+                    // 隐私条款提示
+                    Text(
+                      'By continuing, you agree to our Terms of Service and Privacy Policy',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textGray.withAlpha(150),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+
+                // 底部留空
+                const Expanded(flex: 1, child: SizedBox()),
+              ],
+            ),
           ),
         ),
       ),

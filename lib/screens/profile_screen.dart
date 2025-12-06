@@ -1,11 +1,494 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
 import '../providers/auth_provider.dart';
 import '../models/user_model.dart';
-import '../data/avatar_data.dart'; // 导入头像数据
+import '../data/avatar_data.dart';
+import '../constants/colors.dart';
+import '../constants/text_styles.dart';
+import '../widgets/glass_card.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: AppColors.bgGradient,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // 顶部标题栏
+              GlassCard(
+                margin: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: AppColors.accentGradient,
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.person_outline,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('My Profile', style: AppTextStyles.headline2),
+                          Text(
+                            'Manage your account & settings',
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.lightBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Consumer<AuthProvider>(
+                    builder: (context, authProvider, child) {
+                      final user = authProvider.user;
+                      final userAvatar = AvatarData.avatars.firstWhere(
+                        (avatar) => avatar.id == user.avatar,
+                        orElse: () => AvatarData.avatars.first,
+                      );
+
+                      return Column(
+                        children: [
+                          // 个人资料卡片
+                          GlassCard(
+                            margin: const EdgeInsets.only(bottom: 20),
+                            child: Column(
+                              children: [
+                                // 头像部分
+                                Container(
+                                  width: 100,
+                                  height: 100,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: AppColors.accentGradient,
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.accentBlue.withAlpha(
+                                          76,
+                                        ),
+                                        blurRadius: 15,
+                                        spreadRadius: 3,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      userAvatar.emoji,
+                                      style: const TextStyle(fontSize: 40),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  user.nickname.isNotEmpty
+                                      ? user.nickname
+                                      : 'Guest',
+                                  style: AppTextStyles.headline3,
+                                ),
+                                Text(
+                                  userAvatar.name,
+                                  style: AppTextStyles.caption.copyWith(
+                                    color: AppColors.lightBlue,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Container(
+                                  height: 1,
+                                  color: Colors.white.withAlpha(25),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // 设置部分
+                          _buildSection(
+                            title: 'Settings',
+                            icon: Icons.settings_outlined,
+                            children: [
+                              _buildProfileTile(
+                                icon: Icons.notifications_outlined,
+                                title: 'Notifications',
+                                subtitle: 'Manage notification preferences',
+                                onTap: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Notification settings coming soon!',
+                                        style: AppTextStyles.bodySmall,
+                                      ),
+                                      backgroundColor: AppColors.accentBlue,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              _buildProfileTile(
+                                icon: Icons.palette_outlined,
+                                title: 'Theme',
+                                subtitle: 'Change app theme color',
+                                onTap: () {
+                                  _showThemeSelectionDialog(context);
+                                },
+                              ),
+                              _buildProfileTile(
+                                icon: Icons.visibility_outlined,
+                                title: 'Appearance',
+                                subtitle: 'Dark mode & theme settings',
+                                onTap: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Appearance settings coming soon!',
+                                        style: AppTextStyles.bodySmall,
+                                      ),
+                                      backgroundColor: AppColors.accentBlue,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+
+                          // 个人信息部分
+                          _buildSection(
+                            title: 'Personal Information',
+                            icon: Icons.person_outline,
+                            children: [
+                              _buildProfileTile(
+                                icon: Icons.badge_outlined,
+                                title: 'Nickname',
+                                subtitle: user.nickname.isNotEmpty
+                                    ? user.nickname
+                                    : 'Not set',
+                                onTap: () {
+                                  _showEditNicknameDialog(context, user);
+                                },
+                              ),
+                              _buildProfileTile(
+                                icon: Icons.face_retouching_natural_outlined,
+                                title: 'Cartoon Avatar',
+                                subtitle: 'Choose your character',
+                                onTap: () {
+                                  _showAvatarSelectionDialog(context, user);
+                                },
+                              ),
+                              _buildProfileTile(
+                                icon: Icons.cake_outlined,
+                                title: 'Age',
+                                subtitle: user.age > 0
+                                    ? '${user.age} years old'
+                                    : 'Not set',
+                                onTap: () {
+                                  _showEditAgeDialog(context, user);
+                                },
+                              ),
+                              _buildProfileTile(
+                                icon: Icons.transgender_outlined,
+                                title: 'Gender',
+                                subtitle: user.gender,
+                                onTap: () {
+                                  _showGenderSelectionDialog(context, user);
+                                },
+                              ),
+                            ],
+                          ),
+
+                          // 数据管理部分
+                          _buildSection(
+                            title: 'Data Management',
+                            icon: Icons.storage_outlined,
+                            children: [
+                              _buildProfileTile(
+                                icon: Icons.backup_outlined,
+                                title: 'Export Data',
+                                subtitle: 'Download your mood history',
+                                onTap: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Export feature coming soon!',
+                                        style: AppTextStyles.bodySmall,
+                                      ),
+                                      backgroundColor: AppColors.accentBlue,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              _buildProfileTile(
+                                icon: Icons.delete_sweep_outlined,
+                                title: 'Remove Personal Data',
+                                subtitle: 'Delete all stored information',
+                                onTap: () {
+                                  _showDeleteConfirmationDialog(context);
+                                },
+                                isWarning: true,
+                              ),
+                            ],
+                          ),
+
+                          // 法律部分
+                          _buildSection(
+                            title: 'Legal',
+                            icon: Icons.gavel_outlined,
+                            children: [
+                              _buildProfileTile(
+                                icon: Icons.feedback_outlined,
+                                title: 'Feedback',
+                                subtitle: 'Share your thoughts with us',
+                                onTap: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Feedback system coming soon!',
+                                        style: AppTextStyles.bodySmall,
+                                      ),
+                                      backgroundColor: AppColors.accentBlue,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              _buildProfileTile(
+                                icon: Icons.privacy_tip_outlined,
+                                title: 'Privacy Policy',
+                                subtitle: 'How we protect your data',
+                                onTap: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Privacy policy coming soon!',
+                                        style: AppTextStyles.bodySmall,
+                                      ),
+                                      backgroundColor: AppColors.accentBlue,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              _buildProfileTile(
+                                icon: Icons.description_outlined,
+                                title: 'Terms & Conditions',
+                                subtitle: 'App usage terms',
+                                onTap: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Terms & conditions coming soon!',
+                                        style: AppTextStyles.bodySmall,
+                                      ),
+                                      backgroundColor: AppColors.accentBlue,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+
+                          // 退出按钮
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              top: 20,
+                              bottom: 40,
+                              left: 20,
+                              right: 20,
+                            ),
+                            child: GlassCard(
+                              padding: const EdgeInsets.all(0),
+                              child: OutlinedButton(
+                                onPressed: () => _handleLogout(context),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.drained,
+                                  side: BorderSide(
+                                    color: AppColors.drained.withAlpha(127),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 18,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.logout_outlined,
+                                      color: AppColors.drained,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Reset App Data & Logout',
+                                      style: AppTextStyles.button.copyWith(
+                                        color: AppColors.drained,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSection({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 16),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: AppColors.lightBlue),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: AppTextStyles.headline3.copyWith(
+                    color: AppColors.lightBlue,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          GlassCard(child: Column(children: children)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool isWarning = false,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: isWarning
+                    ? AppColors.drained.withAlpha(25)
+                    : AppColors.accentBlue.withAlpha(25),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: isWarning ? AppColors.drained : AppColors.accentBlue,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: AppTextStyles.subtitle2.copyWith(
+                      color: isWarning ? AppColors.drained : Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: AppTextStyles.caption.copyWith(
+                      color: isWarning
+                          ? AppColors.drained.withAlpha(180)
+                          : AppColors.textGray,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: isWarning ? AppColors.drained : AppColors.textGray,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _handleLogout(BuildContext context) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -13,9 +496,14 @@ class ProfileScreen extends StatelessWidget {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Reset App Data"),
-        content: const Text(
+        backgroundColor: AppColors.cardDark,
+        title: Text(
+          "Reset App Data",
+          style: AppTextStyles.headline3.copyWith(color: Colors.white),
+        ),
+        content: Text(
           "Are you sure you want to clear your personal data and return to the setup screen?",
+          style: AppTextStyles.bodyMedium,
         ),
         actions: [
           TextButton(
@@ -23,9 +511,9 @@ class ProfileScreen extends StatelessWidget {
             onPressed: () => Navigator.pop(context, false),
           ),
           TextButton(
-            child: const Text(
+            child: Text(
               "Confirm Reset",
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: AppColors.drained),
             ),
             onPressed: () => Navigator.pop(context, true),
           ),
@@ -38,330 +526,18 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final user = Provider.of<AuthProvider>(context).user;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("My Profile", style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.purple,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            // User Profile Header
-            _buildProfileHeader(user),
-
-            const SizedBox(height: 32),
-
-            // Settings Section
-            _buildSettingsSection(context),
-
-            const SizedBox(height: 24),
-
-            // Personal Information Section
-            _buildPersonalInfoSection(context, user),
-
-            const SizedBox(height: 24),
-
-            // Data Management Section
-            _buildDataManagementSection(context),
-
-            const SizedBox(height: 24),
-
-            // Legal Section
-            _buildLegalSection(context),
-
-            const SizedBox(height: 40),
-
-            // Logout Button
-            _buildLogoutButton(context),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSettingsSection(BuildContext context) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Settings',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-          _buildListTile(
-            icon: Icons.notifications,
-            title: 'Notifications',
-            subtitle: 'Manage your notification preferences',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Notification settings coming soon!'),
-                ),
-              );
-            },
-          ),
-          _buildListTile(
-            icon: Icons.color_lens,
-            title: 'Theme',
-            subtitle: 'Change app theme color',
-            onTap: () {
-              _showThemeSelectionDialog(context);
-            },
-          ),
-          _buildListTile(
-            icon: Icons.visibility,
-            title: 'Appearance',
-            subtitle: 'Dark mode and theme settings',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Appearance settings coming soon!'),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPersonalInfoSection(BuildContext context, UserModel user) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Personal Information',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-          _buildListTile(
-            icon: Icons.person,
-            title: 'Nickname',
-            subtitle: user.nickname.isNotEmpty ? user.nickname : 'Not set',
-            onTap: () {
-              _showEditNicknameDialog(context, user);
-            },
-          ),
-          _buildListTile(
-            icon: Icons.face,
-            title: 'Cartoon Avatar',
-            subtitle: 'Choose your character',
-            onTap: () {
-              _showAvatarSelectionDialog(context, user);
-            },
-          ),
-          _buildListTile(
-            icon: Icons.cake,
-            title: 'Age',
-            subtitle: user.age > 0 ? '${user.age} years old' : 'Not set',
-            onTap: () {
-              _showEditAgeDialog(context, user);
-            },
-          ),
-          _buildListTile(
-            icon: Icons.transgender,
-            title: 'Gender',
-            subtitle: user.gender,
-            onTap: () {
-              _showGenderSelectionDialog(context, user);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDataManagementSection(BuildContext context) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Data Management',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-          _buildListTile(
-            icon: Icons.backup,
-            title: 'Export Data',
-            subtitle: 'Download your mood history',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Export feature coming soon!')),
-              );
-            },
-          ),
-          _buildListTile(
-            icon: Icons.delete_sweep,
-            title: 'Remove Personal Data',
-            subtitle: 'Delete all your stored information',
-            onTap: () => _showDeleteConfirmationDialog(context),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLegalSection(BuildContext context) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Legal',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-          _buildListTile(
-            icon: Icons.feedback,
-            title: 'Feedback',
-            subtitle: 'Share your thoughts with us',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Feedback system coming soon!')),
-              );
-            },
-          ),
-          _buildListTile(
-            icon: Icons.privacy_tip,
-            title: 'Privacy Policy',
-            subtitle: 'How we protect your data',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Privacy policy coming soon!')),
-              );
-            },
-          ),
-          _buildListTile(
-            icon: Icons.description,
-            title: 'Terms & Conditions',
-            subtitle: 'App usage terms',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Terms & conditions coming soon!'),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfileHeader(UserModel user) {
-    // 根据用户选择的头像显示对应的emoji，如果没有选择则显示默认头像
-    final userAvatar = AvatarData.avatars.firstWhere(
-      (avatar) => avatar.id == user.avatar,
-      orElse: () => AvatarData.avatars.first,
-    );
-
-    return Center(
-      child: Column(
-        children: [
-          // 头像显示
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              color: Colors.purple.shade100,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.purple, width: 3),
-            ),
-            child: Center(
-              child: Text(
-                userAvatar.emoji,
-                style: const TextStyle(fontSize: 40),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            user.nickname.isNotEmpty ? user.nickname : 'Guest',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            userAvatar.name, // 显示头像名称
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLogoutButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton(
-        onPressed: () => _handleLogout(context),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.red,
-          side: const BorderSide(color: Colors.red),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: const Text(
-          "Reset App Data & Logout",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildListTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.purple),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      trailing: const Icon(
-        Icons.arrow_forward_ios,
-        size: 16,
-        color: Colors.grey,
-      ),
-      onTap: onTap,
-    );
-  }
-
   void _showDeleteConfirmationDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Delete Personal Data"),
-        content: const Text(
+        backgroundColor: AppColors.cardDark,
+        title: Text(
+          "Delete Personal Data",
+          style: AppTextStyles.headline3.copyWith(color: Colors.white),
+        ),
+        content: Text(
           "This will permanently delete all your mood entries, check-ins, and personal information. This action cannot be undone.",
+          style: AppTextStyles.bodyMedium,
         ),
         actions: [
           TextButton(
@@ -369,15 +545,23 @@ class ProfileScreen extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
           ),
           TextButton(
-            child: const Text(
+            child: Text(
               "Delete All Data",
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: AppColors.drained),
             ),
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Personal data deletion feature coming soon!'),
+                SnackBar(
+                  content: Text(
+                    'Personal data deletion feature coming soon!',
+                    style: AppTextStyles.bodySmall,
+                  ),
+                  backgroundColor: AppColors.accentBlue,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               );
             },
@@ -387,19 +571,32 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // 编辑昵称对话框
   void _showEditNicknameDialog(BuildContext context, UserModel user) {
     final nicknameController = TextEditingController(text: user.nickname);
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Edit Nickname"),
+        backgroundColor: AppColors.cardDark,
+        title: Text(
+          "Edit Nickname",
+          style: AppTextStyles.headline3.copyWith(color: Colors.white),
+        ),
         content: TextField(
           controller: nicknameController,
-          decoration: const InputDecoration(
-            labelText: 'Nickname',
+          style: AppTextStyles.input,
+          decoration: InputDecoration(
             hintText: 'Enter your nickname',
+            hintStyle: AppTextStyles.bodyLarge.copyWith(
+              color: AppColors.textGray.withAlpha(150),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: AppColors.cardLight,
+            contentPadding: const EdgeInsets.all(16),
           ),
         ),
         actions: [
@@ -419,7 +616,17 @@ class ProfileScreen extends StatelessWidget {
                 authProvider.updateUserInfo(nickname: newNickname);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Nickname updated!')),
+                  SnackBar(
+                    content: Text(
+                      'Nickname updated!',
+                      style: AppTextStyles.bodySmall,
+                    ),
+                    backgroundColor: AppColors.success,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 );
               }
             },
@@ -429,7 +636,6 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // 编辑年龄对话框
   void _showEditAgeDialog(BuildContext context, UserModel user) {
     final ageController = TextEditingController(
       text: user.age > 0 ? user.age.toString() : '',
@@ -438,13 +644,27 @@ class ProfileScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Edit Age"),
+        backgroundColor: AppColors.cardDark,
+        title: Text(
+          "Edit Age",
+          style: AppTextStyles.headline3.copyWith(color: Colors.white),
+        ),
         content: TextField(
           controller: ageController,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Age',
+          style: AppTextStyles.input,
+          decoration: InputDecoration(
             hintText: 'Enter your age',
+            hintStyle: AppTextStyles.bodyLarge.copyWith(
+              color: AppColors.textGray.withAlpha(150),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: AppColors.cardLight,
+            contentPadding: const EdgeInsets.all(16),
           ),
         ),
         actions: [
@@ -465,13 +685,31 @@ class ProfileScreen extends StatelessWidget {
                   );
                   authProvider.updateUserInfo(age: age);
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('Age updated!')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Age updated!',
+                        style: AppTextStyles.bodySmall,
+                      ),
+                      backgroundColor: AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please enter a valid age (1-119)'),
+                    SnackBar(
+                      content: Text(
+                        'Please enter a valid age (1-119)',
+                        style: AppTextStyles.bodySmall,
+                      ),
+                      backgroundColor: AppColors.drained,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   );
                 }
@@ -492,58 +730,60 @@ class ProfileScreen extends StatelessWidget {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text("Select Gender"),
+              backgroundColor: AppColors.cardDark,
+              title: Text(
+                "Select Gender",
+                style: AppTextStyles.headline3.copyWith(color: Colors.white),
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 使用新的 Radio 语法
-                  RadioListTile(
-                    title: const Text('Male'),
+                  RadioListTile<String>(
+                    title: Text('Male', style: AppTextStyles.bodyMedium),
                     value: 'Male',
-                    // ignore: deprecated_member_use
                     groupValue: selectedGender,
-                    // ignore: deprecated_member_use
                     onChanged: (value) {
                       setState(() {
                         selectedGender = value!;
                       });
                     },
+                    activeColor: AppColors.accentBlue,
                   ),
-                  RadioListTile(
-                    title: const Text('Female'),
+                  RadioListTile<String>(
+                    title: Text('Female', style: AppTextStyles.bodyMedium),
                     value: 'Female',
-                    // ignore: deprecated_member_use
                     groupValue: selectedGender,
-                    // ignore: deprecated_member_use
                     onChanged: (value) {
                       setState(() {
                         selectedGender = value!;
                       });
                     },
+                    activeColor: AppColors.accentBlue,
                   ),
-                  RadioListTile(
-                    title: const Text('Non-binary'),
+                  RadioListTile<String>(
+                    title: Text('Non-binary', style: AppTextStyles.bodyMedium),
                     value: 'Non-binary',
-                    // ignore: deprecated_member_use
                     groupValue: selectedGender,
-                    // ignore: deprecated_member_use
                     onChanged: (value) {
                       setState(() {
                         selectedGender = value!;
                       });
                     },
+                    activeColor: AppColors.accentBlue,
                   ),
-                  RadioListTile(
-                    title: const Text('Prefer not to say'),
+                  RadioListTile<String>(
+                    title: Text(
+                      'Prefer not to say',
+                      style: AppTextStyles.bodyMedium,
+                    ),
                     value: 'Prefer not to say',
-                    // ignore: deprecated_member_use
                     groupValue: selectedGender,
-                    // ignore: deprecated_member_use
                     onChanged: (value) {
                       setState(() {
                         selectedGender = value!;
                       });
                     },
+                    activeColor: AppColors.accentBlue,
                   ),
                 ],
               ),
@@ -564,7 +804,15 @@ class ProfileScreen extends StatelessWidget {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Gender updated to: $selectedGender'),
+                          content: Text(
+                            'Gender updated to: $selectedGender',
+                            style: AppTextStyles.bodySmall,
+                          ),
+                          backgroundColor: AppColors.success,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       );
                     }
@@ -578,13 +826,19 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // 新增主题选择对话框
   void _showThemeSelectionDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Select Theme"),
-        content: const Text("Choose your preferred theme color"),
+        backgroundColor: AppColors.cardDark,
+        title: Text(
+          "Select Theme",
+          style: AppTextStyles.headline3.copyWith(color: Colors.white),
+        ),
+        content: Text(
+          "Choose your preferred theme color",
+          style: AppTextStyles.bodyMedium,
+        ),
         actions: [
           TextButton(
             child: const Text("Cancel"),
@@ -595,7 +849,17 @@ class ProfileScreen extends StatelessWidget {
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Theme changed to Purple')),
+                SnackBar(
+                  content: Text(
+                    'Theme changed to Purple',
+                    style: AppTextStyles.bodySmall,
+                  ),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               );
             },
           ),
@@ -604,7 +868,17 @@ class ProfileScreen extends StatelessWidget {
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Theme changed to Blue')),
+                SnackBar(
+                  content: Text(
+                    'Theme changed to Blue',
+                    style: AppTextStyles.bodySmall,
+                  ),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               );
             },
           ),
@@ -613,7 +887,17 @@ class ProfileScreen extends StatelessWidget {
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Theme changed to Green')),
+                SnackBar(
+                  content: Text(
+                    'Theme changed to Green',
+                    style: AppTextStyles.bodySmall,
+                  ),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               );
             },
           ),
@@ -623,7 +907,6 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-// 添加头像选择对话框
 void _showAvatarSelectionDialog(BuildContext context, UserModel user) {
   String selectedAvatar = user.avatar;
 
@@ -632,90 +915,160 @@ void _showAvatarSelectionDialog(BuildContext context, UserModel user) {
     builder: (context) {
       return StatefulBuilder(
         builder: (context, setState) {
-          return AlertDialog(
-            title: const Text("Choose Your Avatar"),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: GridView.builder(
-                shrinkWrap: true,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3, // 每行3个头像
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: 0.8,
-                ),
-                itemCount: AvatarData.avatars.length,
-                itemBuilder: (context, index) {
-                  final avatar = AvatarData.avatars[index];
-                  final isSelected = selectedAvatar == avatar.id;
-
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        selectedAvatar = avatar.id;
-                      });
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? Colors.purple.shade100
-                            : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected
-                              ? Colors.purple
-                              : Colors.transparent,
-                          width: 2,
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            child: GlassCard(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: AppColors.accentGradient,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.face_retouching_natural,
+                          color: Colors.white,
+                          size: 24,
                         ),
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            avatar.emoji,
-                            style: const TextStyle(fontSize: 30),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            avatar.name,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade700,
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        ],
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          "Choose Your Avatar",
+                          style: AppTextStyles.headline3,
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 0.9,
+                        ),
+                    itemCount: AvatarData.avatars.length,
+                    itemBuilder: (context, index) {
+                      final avatar = AvatarData.avatars[index];
+                      final isSelected = selectedAvatar == avatar.id;
+
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            selectedAvatar = avatar.id;
+                          });
+                        },
+                        child: GlassCard(
+                          padding: const EdgeInsets.all(12),
+                          color: isSelected
+                              ? AppColors.accentBlue.withAlpha(25)
+                              : null,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                avatar.emoji,
+                                style: const TextStyle(fontSize: 30),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                avatar.name,
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.caption.copyWith(
+                                  color: isSelected
+                                      ? AppColors.accentBlue
+                                      : AppColors.textGray,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GlassCard(
+                          padding: const EdgeInsets.all(0),
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.accentBlue,
+                              side: BorderSide(
+                                color: AppColors.accentBlue.withAlpha(76),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text("Cancel"),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GlassCard(
+                          padding: const EdgeInsets.all(0),
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (selectedAvatar.isNotEmpty) {
+                                final authProvider = Provider.of<AuthProvider>(
+                                  context,
+                                  listen: false,
+                                );
+                                authProvider.updateUserInfo(
+                                  avatar: selectedAvatar,
+                                );
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Avatar updated!',
+                                      style: AppTextStyles.bodySmall,
+                                    ),
+                                    backgroundColor: AppColors.success,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accentBlue,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text("Save"),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            actions: [
-              TextButton(
-                child: const Text("Cancel"),
-                onPressed: () => Navigator.pop(context),
-              ),
-              TextButton(
-                child: const Text("Save"),
-                onPressed: () {
-                  if (selectedAvatar.isNotEmpty) {
-                    final authProvider = Provider.of<AuthProvider>(
-                      context,
-                      listen: false,
-                    );
-                    authProvider.updateUserInfo(avatar: selectedAvatar);
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Avatar updated!')),
-                    );
-                  }
-                },
-              ),
-            ],
           );
         },
       );
