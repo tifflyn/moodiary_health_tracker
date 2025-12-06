@@ -268,10 +268,10 @@ class _HomeScreenViewState extends State<HomeScreenView> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withValues(alpha:0.1),
+          color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isCompleted ? Colors.green : color.withValues(alpha:0.3),
+            color: isCompleted ? Colors.green : color.withOpacity(0.3),
             width: 2,
           ),
         ),
@@ -280,7 +280,7 @@ class _HomeScreenViewState extends State<HomeScreenView> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isCompleted ? Colors.green : color.withValues(alpha:0.2),
+                color: isCompleted ? Colors.green : color.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
