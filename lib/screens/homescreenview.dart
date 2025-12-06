@@ -421,10 +421,28 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: Icons.mood,
                       ),
                       const SizedBox(height: 12),
-                      _buildTaskItemCompact(
+                      _buildTaskItemCompactWithCallback(
                         title: 'Daily Check-In',
                         completed: controller.checkInCompleted,
                         icon: Icons.edit_note,
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const CheckInScreen(),
+                            ),
+                          );
+
+                          // 如果返回 true，刷新数据
+                          if (result == true) {
+                            _refreshData();
+
+                            // 也通知 DiaryScreen（如果当前是 DiaryScreen）
+                            if (_currentIndex == 1) {
+                              // 这里可以发送一个事件通知 DiaryScreen 刷新
+                            }
+                          }
+                        },
                       ),
                       const SizedBox(height: 12),
                       _buildTaskItemCompact(
@@ -470,6 +488,61 @@ class _HomeScreenState extends State<HomeScreen> {
           ).then((_) => _refreshData());
         }
       },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.cardDark,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: completed
+                    ? AppColors.success.withAlpha(51)
+                    : AppColors.cardLight,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                completed ? Icons.check : icon,
+                size: 16,
+                color: completed ? AppColors.success : AppColors.textGray,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: completed ? AppColors.success : Colors.white,
+                  fontWeight: FontWeight.w500,
+                  decoration: completed ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+            Icon(
+              completed ? Icons.check_circle : Icons.arrow_forward_ios,
+              size: 16,
+              color: completed ? AppColors.success : AppColors.textGray,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 新增：带自定义回调的任务项
+  Widget _buildTaskItemCompactWithCallback({
+    required String title,
+    required bool completed,
+    required IconData icon,
+    required Function() onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(12),

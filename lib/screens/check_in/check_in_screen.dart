@@ -636,12 +636,13 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
                 const SizedBox(height: 32),
 
-                // 按钮
+                // 在 _buildResponseScreen() 中，修改 "Done" 按钮
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
                     onPressed: () {
+                      // 返回 true 表示有新数据
                       Navigator.pop(context, true);
                     },
                     style: ElevatedButton.styleFrom(
