@@ -32,7 +32,7 @@ void main() async {
   // 🎯 使用 .env 中的新 API 密钥
   final geminiApiKey =
       dotenv.env['GEMINI_API_KEY'] ??
-      'AIzaSyDCD6kBoBUxVvq0sigKWF2IOmebvdDXYXQ'; // 你的新密钥
+      'AIzaSyAmxFv_sfWkUd3B0nWhIN0Fpr87T_DCWjo'; // 你的新密钥
 
   AIService.instance.setGeminiApiKey(geminiApiKey);
 
