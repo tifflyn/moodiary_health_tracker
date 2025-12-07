@@ -64,4 +64,9 @@ Thumbs.db
 .idea/
 *.iml
 *.swp
-*.swo
+*.swo.env
+key.properties
+*jks
+/build/
+*.apk
+*.aab
