@@ -146,13 +146,11 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
 
   Widget _buildEnergyGrid() {
     return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.1,
       ),
       itemCount: energies.length,
       itemBuilder: (context, index) {
@@ -162,7 +160,7 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
         return GestureDetector(
           onTap: () => setState(() => selectedEnergy = energy.name),
           child: GlassCard(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             color: isSelected ? energy.color.withAlpha(25) : null,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -181,27 +179,32 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
                         ? [
                             BoxShadow(
                               color: energy.color.withAlpha(100),
-                              blurRadius: 15,
+                              blurRadius: 12,
                               spreadRadius: 3,
                             ),
                           ]
                         : null,
                   ),
-                  child: Icon(energy.icon, size: 32, color: Colors.white),
+                  child: Icon(energy.icon, size: 24, color: Colors.white),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
                   energy.label,
-                  style: AppTextStyles.subtitle2.copyWith(
+                  style: TextStyle(
+                    fontSize: 14, // 减小字体
                     color: isSelected ? energy.color : Colors.white,
                     fontWeight: FontWeight.w600,
                   ),
                   textAlign: TextAlign.center,
+                  maxLines: 2, // 限制最多2行
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${energy.value}/5',
-                  style: AppTextStyles.caption.copyWith(
+                  style: TextStyle(
+                    // 使用自定义样式，减小字体
+                    fontSize: 11, // 减小字体
                     color: isSelected ? energy.color : AppColors.textGray,
                   ),
                 ),
@@ -226,7 +229,7 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
           ),
         ),
         child: SafeArea(
-          child: Column(
+          child: ListView(
             children: [
               // 头部
               GlassCard(
@@ -286,12 +289,11 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
                 ),
               ),
 
-              // 能量级别选择
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildEnergyGrid(),
-                ),
+              // 能量级别选择 - 使用固定的容器高度
+              Container(
+                height: 350, // 给一个足够的高度显示所有电池
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _buildEnergyGrid(),
               ),
 
               // 笔记输入

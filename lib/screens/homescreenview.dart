@@ -92,114 +92,130 @@ class _HomeScreenState extends State<HomeScreen>
 
   // 静态星空背景 - 使用 DiaryScreen 的灰蓝色渐变
   Widget _buildStaticStarfield() {
-    return CustomPaint(
-      painter: StaticStarFieldPainter(_random),
-      child: Container(),
+    return Stack(
+      children: [
+        // 基础渐变背景
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                const Color(0xFF0A0E1F), // 更深的星空色
+                const Color(0xFF1A1A2E),
+                const Color(0xFF16213E),
+                const Color(0xFF0F3460),
+              ],
+              stops: const [0.0, 0.3, 0.7, 1.0],
+            ),
+          ),
+        ),
+
+        // 星云效果
+        CustomPaint(painter: NebulaPainter(_random)),
+
+        // 星空
+        CustomPaint(painter: DreamyStarFieldPainter(_random, _starsAnimation)),
+
+        // 银河带效果
+        Positioned(
+          top: MediaQuery.of(context).size.height * 0.3,
+          left: 0,
+          right: 0,
+          child: CustomPaint(painter: MilkyWayPainter()),
+        ),
+      ],
     );
   }
 
   // 北极星装饰（带轻微转动）
-  Widget _buildPolarisStar() {
-    return Positioned(
-      top: 150,
-      left: 50,
-      child: AnimatedBuilder(
-        animation: _starsAnimation,
-        builder: (context, child) {
-          return Transform.rotate(
-            angle: _starsAnimation.value * 2 * pi * 0.1, // 缓慢旋转
-            child: Transform.scale(
-              scale: 1 + sin(_starsAnimation.value * 2 * pi) * 0.05, // 轻微脉动
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.white.withAlpha(200),
-                      blurRadius: 20,
-                      spreadRadius: 5,
-                    ),
-                    BoxShadow(
-                      color: const Color(0xFF90CAF9).withAlpha(127),
-                      blurRadius: 40,
-                      spreadRadius: 10,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
+  Widget _buildConstellations() {
+    return Stack(
+      children: [
+        // 星座容器 - 使用位置偏移创造空间感
+        Positioned(
+          top: 80,
+          left: 30,
+          child: _buildDreamyConstellation(
+            painter: SouthernCrossPainterV2(),
+            size: 120,
+            color: const Color(0xFF64B5F6),
+            glow: true,
+          ),
+        ),
+
+        Positioned(
+          top: 200,
+          right: 40,
+          child: _buildDreamyConstellation(
+            painter: OrionPainterV2(),
+            size: 160,
+            color: const Color(0xFF9575CD),
+            glow: true,
+          ),
+        ),
+
+        Positioned(
+          bottom: 180,
+          left: MediaQuery.of(context).size.width * 0.2,
+          child: _buildDreamyConstellation(
+            painter: UrsaMajorPainterV2(),
+            size: 140,
+            color: const Color(0xFF4FC3F7),
+            glow: true,
+          ),
+        ),
+
+        Positioned(
+          bottom: 100,
+          right: 50,
+          child: _buildDreamyConstellation(
+            painter: CassiopeiaPainter(), // 新增仙后座
+            size: 100,
+            color: const Color(0xFFE57373),
+            glow: true,
+          ),
+        ),
+      ],
     );
   }
 
-  // 南十字星装饰（带轻微转动）
-  Widget _buildSouthernCross() {
-    return Positioned(
-      top: 300,
-      right: 60,
-      child: AnimatedBuilder(
-        animation: _starsAnimation,
-        builder: (context, child) {
-          return Transform.translate(
-            offset: Offset(
-              sin(_starsAnimation.value * 2 * pi) * 2, // 轻微左右移动
-              cos(_starsAnimation.value * 2 * pi) * 1, // 轻微上下移动
+  // 梦幻星座组件
+  Widget _buildDreamyConstellation({
+    required CustomPainter painter,
+    required double size,
+    required Color color,
+    bool glow = false,
+  }) {
+    return AnimatedBuilder(
+      animation: _starsAnimation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(
+            sin(_starsAnimation.value * 2 * pi) * 3, // 轻微浮动
+            cos(_starsAnimation.value * 4 * pi) * 2,
+          ),
+          child: Transform.scale(
+            scale: 1 + sin(_starsAnimation.value * pi) * 0.02, // 轻微脉动
+            child: Container(
+              width: size,
+              height: size,
+              decoration: glow
+                  ? BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withAlpha(40),
+                          blurRadius: 25,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    )
+                  : null,
+              child: CustomPaint(painter: painter),
             ),
-            child: SizedBox(
-              width: 80,
-              height: 60,
-              child: CustomPaint(painter: SouthernCrossPainter()),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // 猎户座（Orion）装饰
-  Widget _buildOrion() {
-    return Positioned(
-      top: 100,
-      left: MediaQuery.of(context).size.width * 0.2,
-      child: AnimatedBuilder(
-        animation: _starsAnimation,
-        builder: (context, child) {
-          return Transform.rotate(
-            angle: _starsAnimation.value * 2 * pi * 0.05,
-            child: SizedBox(
-              width: 60,
-              height: 100,
-              child: CustomPaint(painter: OrionConstellationPainter()),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // 大熊座（Big Dipper/Ursa Major）装饰
-  Widget _buildUrsaMajor() {
-    return Positioned(
-      bottom: 200,
-      right: MediaQuery.of(context).size.width * 0.3,
-      child: AnimatedBuilder(
-        animation: _starsAnimation,
-        builder: (context, child) {
-          return Transform.rotate(
-            angle: _starsAnimation.value * 2 * pi * -0.03,
-            child: SizedBox(
-              width: 70,
-              height: 40,
-              child: CustomPaint(painter: UrsaMajorPainter()),
-            ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -221,11 +237,7 @@ class _HomeScreenState extends State<HomeScreen>
         // 静态星空背景
         _buildStaticStarfield(),
 
-        // 星座装饰
-        _buildPolarisStar(),
-        _buildSouthernCross(),
-        _buildOrion(),
-        _buildUrsaMajor(),
+        _buildConstellations(),
 
         // 主内容
         NotificationListener<ScrollNotification>(
@@ -1397,6 +1409,309 @@ class _HomeScreenState extends State<HomeScreen>
           : null,
     );
   }
+}
+
+class NebulaPainter extends CustomPainter {
+  final Random random;
+
+  NebulaPainter(this.random);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 创建多个柔和的光晕作为星云
+    final nebulaColors = [
+      const Color(0xFF1E3A8A).withAlpha(15),
+      const Color(0xFF3730A3).withAlpha(10),
+      const Color(0xFF5B21B6).withAlpha(8),
+      const Color(0xFF7C3AED).withAlpha(5),
+    ];
+
+    for (int i = 0; i < 4; i++) {
+      final paint = Paint()
+        ..color = nebulaColors[i]
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 80 + i * 20);
+
+      final center = Offset(
+        random.nextDouble() * size.width,
+        random.nextDouble() * size.height,
+      );
+      final radius = 80 + random.nextDouble() * 120;
+
+      canvas.drawCircle(center, radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// 梦幻星空
+class DreamyStarFieldPainter extends CustomPainter {
+  final Random random;
+  final Animation<double> animation;
+
+  DreamyStarFieldPainter(this.random, this.animation);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint();
+
+    // 绘制不同大小的星星
+    for (int i = 0; i < 80; i++) {
+      final x = random.nextDouble() * size.width;
+      final y = random.nextDouble() * size.height;
+
+      // 星星大小和透明度根据位置变化
+      final distanceFromCenter =
+          (Offset(x, y) - Offset(size.width / 2, size.height / 2)).distance;
+      final normalizedDistance = distanceFromCenter / (size.width / 2);
+
+      // 闪烁效果
+      final flicker = (sin(animation.value * pi * 2 + i * 0.1) + 1) / 2;
+
+      // 小星星
+      if (i % 3 == 0) {
+        paint.color = Colors.white.withAlpha((30 + flicker * 40).toInt());
+        final radius = 0.1 + random.nextDouble() * 0.3;
+        canvas.drawCircle(Offset(x, y), radius, paint);
+      }
+      // 中等星星
+      else if (i % 3 == 1) {
+        paint.color = const Color(
+          0xFFB3E5FC,
+        ).withAlpha((60 + flicker * 60).toInt());
+        final radius = 0.3 + random.nextDouble() * 0.5;
+        canvas.drawCircle(Offset(x, y), radius, paint);
+
+        // 光晕
+        final glowPaint = Paint()
+          ..color = const Color(0xFFB3E5FC).withAlpha(20)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+        canvas.drawCircle(Offset(x, y), radius * 2, glowPaint);
+      }
+      // 大星星
+      else {
+        paint.color = Colors.white.withAlpha((100 + flicker * 80).toInt());
+        final radius = 0.6 + random.nextDouble() * 0.8;
+        canvas.drawCircle(Offset(x, y), radius, paint);
+
+        // 更强的光晕
+        final glowPaint = Paint()
+          ..color = Colors.white.withAlpha(40)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+        canvas.drawCircle(Offset(x, y), radius * 3, glowPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// 银河带
+class MilkyWayPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          Colors.transparent,
+          const Color(0x1AFFFFFF), // 非常浅的白色
+          const Color(0x33B3E5FC), // 浅蓝
+          const Color(0x1AFFFFFF),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
+      ).createShader(Rect.fromLTRB(0, 0, size.width, 100))
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 30);
+
+    canvas.drawRect(Rect.fromLTRB(0, 0, size.width, 100), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// 南十字星 V2
+class SouthernCrossPainterV2 extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final starPaint = Paint()
+      ..color = const Color(0xFF64B5F6).withAlpha(200)
+      ..style = PaintingStyle.fill;
+
+    final glowPaint = Paint()
+      ..color = const Color(0xFF64B5F6).withAlpha(40)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
+    final linePaint = Paint()
+      ..color = const Color(0xFF64B5F6).withAlpha(120)
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    // 主星
+    final stars = [
+      Offset(size.width * 0.5, size.height * 0.3),
+      Offset(size.width * 0.5, size.height * 0.7),
+      Offset(size.width * 0.3, size.height * 0.5),
+      Offset(size.width * 0.7, size.height * 0.5),
+    ];
+
+    // 绘制光晕
+    for (final star in stars) {
+      canvas.drawCircle(star, 10, glowPaint);
+      canvas.drawCircle(star, 3, starPaint);
+    }
+
+    // 连接线条 - 只连接形成十字
+    canvas.drawLine(stars[0], stars[1], linePaint);
+    canvas.drawLine(stars[2], stars[3], linePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// 猎户座 V2
+class OrionPainterV2 extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final starPaint = Paint()
+      ..color = const Color(0xFF9575CD).withAlpha(220)
+      ..style = PaintingStyle.fill;
+
+    final glowPaint = Paint()
+      ..color = const Color(0xFF9575CD).withAlpha(50)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+
+    final linePaint = Paint()
+      ..color = const Color(0xFF9575CD).withAlpha(100)
+      ..strokeWidth = 1.0
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    // 猎户座主要星星
+    final stars = [
+      Offset(size.width * 0.3, size.height * 0.4), // 左肩
+      Offset(size.width * 0.7, size.height * 0.3), // 右肩
+      Offset(size.width * 0.25, size.height * 0.65), // 左腰带
+      Offset(size.width * 0.5, size.height * 0.6), // 中腰带
+      Offset(size.width * 0.75, size.height * 0.55), // 右腰带
+      Offset(size.width * 0.2, size.height * 0.85), // 左脚
+      Offset(size.width * 0.8, size.height * 0.8), // 右脚
+    ];
+
+    // 绘制光晕和星星
+    for (final star in stars) {
+      canvas.drawCircle(star, 12, glowPaint);
+      canvas.drawCircle(star, 2.5, starPaint);
+    }
+
+    // 连接线条 - 形成更优雅的形状
+    canvas.drawLine(stars[0], stars[2], linePaint);
+    canvas.drawLine(stars[1], stars[4], linePaint);
+
+    // 腰带
+    for (int i = 2; i < 4; i++) {
+      canvas.drawLine(stars[i], stars[i + 1], linePaint);
+    }
+
+    // 腿
+    canvas.drawLine(stars[2], stars[5], linePaint);
+    canvas.drawLine(stars[4], stars[6], linePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// 大熊座 V2
+class UrsaMajorPainterV2 extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final starPaint = Paint()
+      ..color = const Color(0xFF4FC3F7).withAlpha(220)
+      ..style = PaintingStyle.fill;
+
+    final glowPaint = Paint()
+      ..color = const Color(0xFF4FC3F7).withAlpha(50)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+
+    final linePaint = Paint()
+      ..color = const Color(0xFF4FC3F7).withAlpha(100)
+      ..strokeWidth = 1.0
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    // 北斗七星 + 一些辅助星
+    final stars = [
+      Offset(size.width * 0.1, size.height * 0.2), // 1
+      Offset(size.width * 0.25, size.height * 0.1), // 2
+      Offset(size.width * 0.4, size.height * 0.15), // 3
+      Offset(size.width * 0.5, size.height * 0.35), // 4
+      Offset(size.width * 0.7, size.height * 0.45), // 5
+      Offset(size.width * 0.6, size.height * 0.65), // 6
+      Offset(size.width * 0.4, size.height * 0.75), // 7
+    ];
+
+    // 绘制光晕和星星
+    for (final star in stars) {
+      canvas.drawCircle(star, 10, glowPaint);
+      canvas.drawCircle(star, 2.2, starPaint);
+    }
+
+    // 连接线条形成北斗形状
+    for (int i = 0; i < stars.length - 1; i++) {
+      canvas.drawLine(stars[i], stars[i + 1], linePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// 新增：仙后座（优雅的W形状）
+class CassiopeiaPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final starPaint = Paint()
+      ..color = const Color(0xFFE57373).withAlpha(220)
+      ..style = PaintingStyle.fill;
+
+    final glowPaint = Paint()
+      ..color = const Color(0xFFE57373).withAlpha(40)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
+    final linePaint = Paint()
+      ..color = const Color(0xFFE57373).withAlpha(120)
+      ..strokeWidth = 1.0
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    // 仙后座的主要星星（W形状）
+    final stars = [
+      Offset(size.width * 0.2, size.height * 0.8),
+      Offset(size.width * 0.4, size.height * 0.6),
+      Offset(size.width * 0.5, size.height * 0.7),
+      Offset(size.width * 0.6, size.height * 0.5),
+      Offset(size.width * 0.8, size.height * 0.7),
+    ];
+
+    // 绘制光晕和星星
+    for (final star in stars) {
+      canvas.drawCircle(star, 9, glowPaint);
+      canvas.drawCircle(star, 2.0, starPaint);
+    }
+
+    // 连接形成W形状
+    for (int i = 0; i < stars.length - 1; i++) {
+      canvas.drawLine(stars[i], stars[i + 1], linePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // 静态星空绘画器 - 使用 DiaryScreen 的灰蓝色调

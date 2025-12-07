@@ -25,12 +25,12 @@ class ConfigManager {
 
   // Validate that all required keys are present
   static Future<void> _validateRequiredKeys() async {
-    final requiredKeys = ['AIzaSyDCD6kBoBUxVvq0sigKWF2IOmebvdDXYXQ'];
+    final requiredKeys = ['AIzaSyAmxFv_sfWkUd3B0nWhIN0Fpr87T_DCWjo'];
     final missingKeys = <String>[];
 
     for (final key in requiredKeys) {
       final value = dotenv.get(key, fallback: '');
-      if (value.isEmpty || value == 'AIzaSyDCD6kBoBUxVvq0sigKWF2IOmebvdDXYXQ') {
+      if (value.isEmpty || value == 'AIzaSyAmxFv_sfWkUd3B0nWhIN0Fpr87T_DCWjo') {
         missingKeys.add(key);
       }
     }
@@ -51,14 +51,14 @@ class ConfigManager {
       );
     }
 
-    final key = dotenv.get('AIzaSyDCD6kBoBUxVvq0sigKWF2IOmebvdDXYXQ');
+    final key = dotenv.get('AIzaSyAmxFv_sfWkUd3B0nWhIN0Fpr87T_DCWjo');
 
     // Additional validation
     if (key.isEmpty) {
-      throw Exception('AIzaSyDCD6kBoBUxVvq0sigKWF2IOmebvdDXYXQ');
+      throw Exception('AIzaSyAmxFv_sfWkUd3B0nWhIN0Fpr87T_DCWjo');
     }
 
-    if (key.contains('AIzaSyDCD6kBoBUxVvq0sigKWF2IOmebvdDXYXQ')) {
+    if (key.contains('AIzaSyAmxFv_sfWkUd3B0nWhIN0Fpr87T_DCWjo')) {
       throw Exception('GEMINI_API_KEY is still using placeholder value');
     }
 
