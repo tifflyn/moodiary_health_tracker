@@ -15,12 +15,27 @@ With the rise of remote work and digital lifestyles, many people are experiencin
 
 ## Execution / Run
 1. Run "flutter pub get" at command prompt
-2. Run "flutter run" ro tun the code
+2. Run "flutter run" ro run the code
+3. Output displayes at device emulator.
 
+## Download App on Android Device
+1. Click on release version 1 github link on your android phone
+2. Click 'Download Anyways' when warn about there may be harmful substance
+ *Don't use UTM wifi while signing up or signing in the account!*
+3. Create account using gmail
+4. When vertification gmail sent, navigate to spam files to find the vertification email
+5. After verified, open back the app, proceed signing in
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Demo of using Firebase and Gemini API
+### Demo Responsive AI Chatbot
+https://github.com/user-attachments/assets/3fe723ad-9c99-489d-b6ab-3caa559bebcd
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### Demo User Sign In using gmail account 
+We found out after presentation that our firebase is still applicable, its the UTM Wifi that's the problem that we can't access our firebase
+Thats why we can't log in or create account during presentation... Hopefully this video can be the evidence that we already successfully implement our backend
+https://github.com/user-attachments/assets/765db455-0389-4714-996a-a93b9abb6ba8
+
+### Demo User save their diary into firebase
+This function did not work out during presentation too, with the ssame problme mentioned above, it's UTM Wifi that blocked the access of firebase
+https://github.com/user-attachments/assets/1679d550-9fda-46d3-9ad1-414fab165c55
+
