@@ -30,12 +30,21 @@ With the rise of remote work and digital lifestyles, many people are experiencin
 ### Demo Responsive AI Chatbot
 https://github.com/user-attachments/assets/3fe723ad-9c99-489d-b6ab-3caa559bebcd
 
+![AI_Theraphy_Style_Response](https://github.com/user-attachments/assets/3c0ac66c-c719-4450-9883-e2dba1f7eb03)
+
+![AI_Theraphy_Style_Response](https://github.com/user-attachments/assets/6f2099a5-102a-42fe-89d7-4f28787acffb)
+
+![AI_Theraphy_Style_Response](https://github.com/user-attachments/assets/25c0c2c1-dbce-4da9-a0ed-17396c183b53)
+
 ### Demo User Sign In using gmail account 
+
 We found out after presentation that our firebase is still applicable, its the UTM Wifi that's the problem that we can't access our firebase
 Thats why we can't log in or create account during presentation... Hopefully this video can be the evidence that we already successfully implement our backend
+
 https://github.com/user-attachments/assets/765db455-0389-4714-996a-a93b9abb6ba8
 
 ### Demo User save their diary into firebase
 This function did not work out during presentation too, with the ssame problme mentioned above, it's UTM Wifi that blocked the access of firebase
+
 https://github.com/user-attachments/assets/1679d550-9fda-46d3-9ad1-414fab165c55
 
